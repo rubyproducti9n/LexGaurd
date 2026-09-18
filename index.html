@@ -1,0 +1,3930 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="LexGuard — AI-powered legal document intelligence. Understand contracts, identify risks, and prepare for legal consultations. Powered by Google Gemini.">
+  <title>LexGuard — Legal Document Intelligence</title>
+
+  <!-- Google Fonts & Material Symbols (Light 200 Weight) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,200,0,0" rel="stylesheet">
+
+  <style>
+    /* ==========================================================================
+       Design System Variables (Ethereal Glass & OLED Palette)
+       ========================================================================== */
+    :root {
+      --bg-primary:     #050508;   /* deeper OLED black */
+      --bg-surface:     #0E0E14;   /* cards base */
+      --bg-elevated:    #16161F;   /* elevated surfaces */
+      --bg-glass:       rgba(255, 255, 255, 0.03); /* glass card fill */
+      --accent-blue:    #5B8DEF;   /* refined, desaturated blue */
+      --accent-blue-h:  #6B9DF7;
+      --accent-green:   #27C492;
+      --accent-amber:   #E8993A;
+      --accent-red:     #E85D5D;
+      --text-primary:   #EEEEF5;
+      --text-secondary: #7878A0;
+      --text-muted:     #3D3D55;
+      --border:         rgba(255, 255, 255, 0.07); /* hairline */
+      --border-strong:  rgba(255, 255, 255, 0.12);
+      --glow-blue:      rgba(91, 141, 239, 0.15);
+      --shadow-colored: 0 8px 32px rgba(91, 141, 239, 0.08);
+      --shadow-surface: 0 20px 48px rgba(0, 0, 0, 0.5);
+
+      --radius-sm: 8px;
+      --radius-md: 14px;
+      --radius-lg: 24px;
+      --radius-xl: 28px;
+
+      --font-display: 'Instrument Serif', serif;
+      --font-body: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --transition: 0.2s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+
+    /* ==========================================================================
+       CSS Reset, Noise Overlay & Base Styles
+       ========================================================================== */
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      height: 100%;
+      overflow: hidden; /* body never scrolls */
+      margin: 0;
+      background-color: var(--bg-primary);
+      font-family: var(--font-body);
+      color: var(--text-primary);
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      position: relative;
+    }
+
+    #app {
+      position: fixed;
+      inset: 0;
+      bottom: 48px; /* clears disclaimer bar height */
+      overflow: hidden;
+    }
+
+    /* Fixed Micro-Noise Texture */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 9999;
+      opacity: 0.4;
+    }
+
+    ::selection {
+      background: rgba(91, 141, 239, 0.25);
+      color: var(--text-primary);
+    }
+
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: var(--text-muted);
+      border-radius: 100px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--text-secondary);
+    }
+
+    /* Headings */
+    h1, h2, h3, h4 {
+      text-wrap: balance;
+      letter-spacing: -0.02em;
+    }
+
+    button {
+      font-family: inherit;
+      border: none;
+      background: none;
+      cursor: pointer;
+      color: inherit;
+    }
+
+    :focus-visible {
+      outline: 2px solid var(--accent-blue);
+      outline-offset: 3px;
+      border-radius: 6px;
+    }
+    :focus:not(:focus-visible) {
+      outline: none;
+    }
+
+    /* ==========================================================================
+       All Screens Base Style & Transitions (Steps 2 & 3)
+       ========================================================================== */
+    [id^="screen-"] {
+      position: absolute;
+      inset: 0;
+      display: none;        /* hidden by default */
+      flex-direction: column;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      opacity: 0;
+      transition: opacity 0.3s cubic-bezier(0.32,0.72,0,1);
+    }
+    [id^="screen-"].screen-active {
+      opacity: 1;
+    }
+
+    /* Results screen gets smooth internal scroll */
+    #screen-results {
+      display: none;
+      overflow-y: auto;
+      scroll-behavior: smooth;
+    }
+
+    /* Loading screen — no scroll needed */
+    #screen-loading {
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      [id^="screen-"] { transition: none; }
+    }
+
+    .reveal {
+      opacity: 0;
+      transform: translateY(16px);
+      transition: opacity 0.7s cubic-bezier(0.32, 0.72, 0, 1),
+                  transform 0.7s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+    .reveal.revealed {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+      .reveal {
+        opacity: 1 !important;
+        transform: none !important;
+        transition: none !important;
+      }
+    }
+
+    /* Accessibility Utilities */
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    /* ==========================================================================
+       LexGuard Logo System
+       ========================================================================== */
+    .header-logo {
+      display: inline-flex;
+      align-items: baseline;
+      font-size: 1.45rem;
+      letter-spacing: -0.02em;
+      line-height: 1;
+      user-select: none;
+    }
+    .logo-lex {
+      font-family: var(--font-display);
+      font-style: italic;
+      color: var(--accent-blue);
+      font-weight: 400;
+      font-size: 1.55rem;
+    }
+    .logo-guard {
+      font-family: var(--font-display);
+      color: var(--text-primary);
+      font-weight: 400;
+      font-size: 1.55rem;
+    }
+
+    /* ==========================================================================
+       Form & Interactive Controls (Button-in-Button & Inputs)
+       ========================================================================== */
+    .form-label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+
+    .form-input, .key-input {
+      background: var(--bg-primary);
+      border: 1px solid var(--border-strong);
+      border-radius: 12px;
+      padding: 14px 16px;
+      color: var(--text-primary);
+      font-family: var(--font-body);
+      font-size: 0.9rem;
+      width: 100%;
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
+      transition: border-color 0.2s cubic-bezier(0.32, 0.72, 0, 1),
+                  box-shadow 0.2s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+    .form-input:focus, .key-input:focus {
+      border-color: var(--accent-blue);
+      box-shadow: 0 0 0 3px rgba(91, 141, 239, 0.15), inset 0 1px 2px rgba(0, 0, 0, 0.4);
+      outline: none;
+    }
+
+    .form-error {
+      color: var(--accent-red);
+      font-size: 0.82rem;
+      margin-top: 8px;
+      min-height: 20px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Button-in-Button Primary Pattern */
+    .btn-primary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      background: var(--accent-blue);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 12px;
+      padding: 10px 10px 10px 20px;
+      color: #FFFFFF;
+      font-family: var(--font-body);
+      font-weight: 500;
+      font-size: 0.92rem;
+      cursor: pointer;
+      box-shadow: 0 4px 20px rgba(91, 141, 239, 0.25);
+      transition: transform 0.2s cubic-bezier(0.32, 0.72, 0, 1),
+                  background 0.2s cubic-bezier(0.32, 0.72, 0, 1),
+                  box-shadow 0.2s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+    .btn-primary:hover {
+      background: var(--accent-blue-h);
+      box-shadow: 0 6px 28px rgba(91, 141, 239, 0.35);
+    }
+    .btn-primary:active {
+      transform: scale(0.985);
+    }
+    .btn-primary .btn-icon-wrap {
+      width: 34px;
+      height: 34px;
+      background: rgba(0, 0, 0, 0.22);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.2s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+    .btn-primary:hover .btn-icon-wrap {
+      transform: translateX(2px);
+    }
+    .btn-primary:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    /* Secondary / Ghost Buttons */
+    .btn-text-secondary, .btn-ghost {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      padding: 6px 14px;
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+      transition: all 0.2s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+    .btn-text-secondary:hover, .btn-ghost:hover {
+      color: var(--text-primary);
+      background: rgba(255, 255, 255, 0.08);
+      border-color: var(--border-strong);
+    }
+
+    /* ==========================================================================
+       API Key Settings Panel CSS (Step 3)
+       ========================================================================== */
+    /* Settings trigger button */
+    #btn-settings {
+      position: relative;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 10px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s cubic-bezier(0.32,0.72,0,1);
+    }
+    #btn-settings:hover {
+      border-color: var(--border-strong);
+      color: var(--text-primary);
+    }
+    #btn-settings.has-key {
+      border-color: rgba(39,196,146,0.3);
+      color: var(--accent-green);
+    }
+
+    /* Status dot on settings button */
+    .status-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      position: absolute;
+      top: 6px; right: 6px;
+    }
+    .status-dot--empty  { background: var(--accent-amber); }
+    .status-dot--saved  { background: var(--accent-green); }
+
+    /* Settings panel */
+    #settings-panel {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-strong);
+      border-top: none;
+      border-radius: 0 0 16px 16px;
+      overflow: hidden;
+      max-height: 0;
+      transition: max-height 0.35s cubic-bezier(0.32,0.72,0,1),
+                  opacity 0.25s cubic-bezier(0.32,0.72,0,1);
+      opacity: 0;
+      max-width: 500px;
+      margin: -20px auto 28px;
+      width: 100%;
+    }
+    #settings-panel:not([hidden]) {
+      max-height: 200px;
+      opacity: 1;
+    }
+    .settings-panel-inner {
+      padding: 16px 20px 20px;
+    }
+    .settings-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .settings-label {
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .settings-label .material-symbols-outlined {
+      font-size: 16px;
+    }
+    .settings-link {
+      font-size: 0.75rem;
+      color: var(--accent-blue);
+      text-decoration: none;
+    }
+    .settings-link:hover { text-decoration: underline; }
+
+    /* Input row */
+    .settings-input-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .settings-input-row input {
+      flex: 1;
+      background: var(--bg-primary);
+      border: 1px solid var(--border-strong);
+      border-radius: 10px;
+      padding: 10px 14px;
+      color: var(--text-primary);
+      font-size: 0.85rem;
+      font-family: var(--font-body);
+      transition: border-color 0.2s cubic-bezier(0.32,0.72,0,1),
+                  box-shadow 0.2s cubic-bezier(0.32,0.72,0,1);
+    }
+    .settings-input-row input:focus {
+      outline: none;
+      border-color: var(--accent-blue);
+      box-shadow: 0 0 0 3px var(--glow-blue);
+    }
+    #btn-key-toggle {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      transition: all 0.2s cubic-bezier(0.32,0.72,0,1);
+    }
+    #btn-key-toggle:hover { color: var(--text-primary); }
+    #btn-key-save {
+      background: var(--accent-blue);
+      border: none;
+      border-radius: 8px;
+      padding: 10px 16px;
+      color: #fff;
+      font-size: 0.82rem;
+      font-weight: 500;
+      font-family: var(--font-body);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s cubic-bezier(0.32,0.72,0,1);
+    }
+    #btn-key-save:hover { background: #6B9DF7; }
+    #btn-key-save:active { transform: scale(0.97); }
+
+    /* Error + saved messages */
+    .settings-error {
+      font-size: 0.78rem;
+      color: var(--accent-red);
+      margin-top: 8px;
+    }
+    .settings-saved {
+      font-size: 0.78rem;
+      color: var(--accent-green);
+      margin-top: 8px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .settings-saved .material-symbols-outlined { font-size: 14px; }
+
+    /* ==========================================================================
+       SCREEN 2: Document Input (#screen-input)
+       ========================================================================== */
+    #screen-input {
+      max-width: 920px;
+      margin: 0 auto;
+      padding: 0 20px 60px;
+      width: 100%;
+    }
+
+    /* Floating Glass Pill Header Nav */
+    #input-header, .input-header {
+      position: sticky;
+      top: 16px;
+      margin: 16px auto 32px;
+      max-width: fit-content;
+      background: rgba(14, 14, 20, 0.82);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--border-strong);
+      border-radius: 100px;
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      z-index: 50;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    /* Mode Toggle refined pills */
+    .mode-toggle-container {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 28px;
+    }
+    .mode-toggle-pills {
+      display: inline-flex;
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      padding: 3px;
+      gap: 2px;
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
+    }
+    .mode-pill {
+      padding: 8px 20px;
+      border-radius: 100px;
+      font-size: 0.84rem;
+      font-weight: 500;
+      border: none;
+      cursor: pointer;
+      background: transparent;
+      color: var(--text-secondary);
+      transition: all 0.2s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+    .mode-pill.active {
+      background: var(--bg-elevated);
+      color: var(--text-primary);
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4), 0 0 0 1px var(--border);
+    }
+    .mode-pill:hover:not(.active) {
+      color: var(--text-primary);
+    }
+
+    /* Document Input Panes & Double-Bezel Textareas */
+    .docs-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 24px;
+      margin-bottom: 28px;
+    }
+    .docs-grid.compare-mode {
+      grid-template-columns: 1fr 1fr;
+    }
+    @media (max-width: 768px) {
+      .docs-grid.compare-mode {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .doc-pane {
+      display: flex;
+      flex-direction: column;
+    }
+    .doc-input-outer {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 4px;
+      transition: border-color 0.2s cubic-bezier(0.32, 0.72, 0, 1),
+                  box-shadow 0.2s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+    .doc-input-outer:focus-within {
+      border-color: var(--border-strong);
+      box-shadow: 0 0 0 3px var(--glow-blue);
+    }
+    .doc-textarea, .form-textarea {
+      background: var(--bg-surface);
+      border: none;
+      border-radius: 16px;
+      padding: 20px 22px;
+      width: 100%;
+      min-height: 280px;
+      color: var(--text-primary);
+      font-family: var(--font-body);
+      font-size: 0.9rem;
+      line-height: 1.65;
+      resize: vertical;
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
+      outline: none;
+    }
+    .doc-textarea::placeholder, .form-textarea::placeholder {
+      color: var(--text-muted);
+    }
+
+    /* Error Notification Banner */
+    .error-banner {
+      position: fixed;
+      top: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1200;
+      max-width: 90%;
+      width: 500px;
+      background: rgba(22, 22, 31, 0.95);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--border-strong);
+      border-left: 3px solid var(--accent-red);
+      border-radius: 12px;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
+      color: var(--text-primary);
+      font-size: 0.88rem;
+    }
+    .error-banner[hidden] {
+      display: none !important;
+    }
+    .btn-dismiss-banner {
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px;
+      border-radius: 6px;
+      transition: color 0.2s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+    .btn-dismiss-banner:hover {
+      color: var(--text-primary);
+    }
+
+    /* ==========================================================================
+       SCREEN 3: Loading Screen (#screen-loading)
+       ========================================================================== */
+    #screen-loading {
+      padding: 24px;
+      text-align: center;
+      position: relative;
+    }
+    #screen-loading::before {
+      content: '';
+      position: absolute;
+      width: 500px;
+      height: 500px;
+      background: radial-gradient(circle, var(--glow-blue) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .pulse-ring-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 24px;
+      position: relative;
+      z-index: 1;
+    }
+    .loading-orb {
+      width: 96px;
+      height: 96px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%,
+        rgba(91, 141, 239, 0.3) 0%,
+        rgba(91, 141, 239, 0.05) 60%,
+        transparent 100%);
+      border: 1px solid rgba(91, 141, 239, 0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: orb-breathe 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+      box-shadow: 0 0 40px rgba(91, 141, 239, 0.15),
+                  inset 0 1px 1px rgba(255, 255, 255, 0.1);
+    }
+    @keyframes orb-breathe {
+      0%, 100% { transform: scale(1);    opacity: 0.85; }
+      50%       { transform: scale(1.08); opacity: 1;    }
+    }
+    #loading-status {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      letter-spacing: 0.02em;
+      min-height: 28px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ==========================================================================
+       SCREEN 4: Results Screen (#screen-results)
+       ========================================================================== */
+    #screen-results {
+      width: 100%;
+    }
+
+    /* Results Sticky Pill Header */
+    #results-header {
+      position: sticky;
+      top: 16px;
+      margin: 16px auto 28px;
+      max-width: fit-content;
+      background: rgba(14, 14, 20, 0.85);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--border-strong);
+      border-radius: 100px;
+      padding: 8px 12px 8px 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      z-index: 50;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    .results-header-inner {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .results-meta-badges {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .badge-doc-type {
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--accent-blue);
+      border-radius: 100px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 4px 10px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      border: 1px solid rgba(91, 141, 239, 0.25);
+    }
+
+    .badge-complexity {
+      border-radius: 100px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 4px 10px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .badge-complexity.low {
+      color: var(--accent-green);
+      background: rgba(39, 196, 146, 0.12);
+      border: 1px solid rgba(39, 196, 146, 0.25);
+    }
+    .badge-complexity.medium {
+      color: var(--accent-amber);
+      background: rgba(232, 153, 58, 0.12);
+      border: 1px solid rgba(232, 153, 58, 0.25);
+    }
+    .badge-complexity.high {
+      color: var(--accent-red);
+      background: rgba(232, 93, 93, 0.12);
+      border: 1px solid rgba(232, 93, 93, 0.25);
+    }
+
+    .results-content-container {
+      max-width: 1140px;
+      margin: 0 auto;
+      padding: 0 20px 60px;
+    }
+
+    /* Document Summary Strip */
+    .results-summary-strip {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 18px 24px;
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      max-width: 900px;
+      margin: 0 auto 32px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    }
+    .results-summary-strip .summary-icon {
+      color: var(--accent-blue);
+      font-size: 22px;
+      margin-top: 2px;
+      flex-shrink: 0;
+    }
+    .results-summary-text {
+      color: var(--text-secondary);
+      font-size: 0.92rem;
+      line-height: 1.6;
+    }
+
+    /* Visuals Grid & Universal Double-Bezel Cards */
+    .visuals-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      max-width: 1100px;
+      margin: 0 auto 32px;
+    }
+    @media (max-width: 768px) {
+      .visuals-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .visual-slot {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    /* Double-Bezel Card Archetype for all dynamic cards */
+    .visual-card, .red-flags-card, .lp-panel-card, .consult-card {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 5px;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    }
+
+    .visual-card-header, .red-flags-header, .lp-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 16px 20px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .visual-card-title, .red-flags-title, .lp-title {
+      font-size: 0.74rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Source Attribution Details Accordion */
+    .source-detail {
+      margin-top: 10px;
+      border-left: 2px solid var(--accent-blue);
+      border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+      background: rgba(255, 255, 255, 0.02);
+      overflow: hidden;
+    }
+    .source-detail summary {
+      padding: 6px 12px;
+      cursor: pointer;
+      font-size: 0.78rem;
+      color: var(--accent-blue);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      user-select: none;
+      list-style: none;
+      transition: color 0.2s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+    .source-detail summary::-webkit-details-marker { display: none; }
+    .source-detail summary::before {
+      content: '▸';
+      font-size: 0.7rem;
+      transition: transform 0.2s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+    .source-detail[open] summary::before {
+      transform: rotate(90deg);
+    }
+    .source-detail blockquote {
+      margin: 0;
+      padding: 10px 14px;
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+      font-style: italic;
+      line-height: 1.55;
+      border-top: 1px solid var(--border);
+    }
+
+    /* Severity Badges (Text + Icon + Color) */
+    .severity-pill {
+      font-size: 0.65rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 100px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      line-height: 1;
+    }
+    .severity-pill.high, .severity-high {
+      background: rgba(232, 93, 93, 0.12);
+      color: var(--accent-red);
+      border: 1px solid rgba(232, 93, 93, 0.25);
+    }
+    .severity-pill.medium, .severity-medium {
+      background: rgba(232, 153, 58, 0.12);
+      color: var(--accent-amber);
+      border: 1px solid rgba(232, 153, 58, 0.25);
+    }
+    .severity-pill.low, .severity-low {
+      background: rgba(39, 196, 146, 0.12);
+      color: var(--accent-green);
+      border: 1px solid rgba(39, 196, 146, 0.25);
+    }
+
+    /* Progress Tracks & Bars */
+    .progress-track, .risk-progress-track {
+      height: 5px;
+      background: var(--bg-elevated);
+      border-radius: 100px;
+      overflow: hidden;
+      width: 100%;
+    }
+    .progress-fill, .risk-progress-bar {
+      height: 100%;
+      border-radius: 100px;
+      transition: width 0.8s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+
+    /* ==========================================================================
+       VISUAL 1: Risk Assessment Meter
+       ========================================================================== */
+    .risk-meter-content {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+    }
+    .risk-arc-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+    .risk-level-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-top: 6px;
+    }
+    .risk-breakdown-heading {
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+      text-align: center;
+    }
+    .risk-categories-list {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .risk-category-row {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+    }
+    .risk-category-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 0.88rem;
+    }
+    .risk-category-name {
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+    .risk-category-score {
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      font-size: 0.88rem;
+    }
+    .risk-category-note {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      margin-top: 8px;
+    }
+
+    /* ==========================================================================
+       VISUAL 2: Clause Map
+       ========================================================================== */
+    .clause-map-list {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      max-height: 540px;
+      overflow-y: auto;
+    }
+    .clause-card-item {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+    .clause-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .clause-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .clause-badge {
+      font-size: 0.68rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: 100px;
+      letter-spacing: 0.04em;
+    }
+    .clause-body-text {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      line-height: 1.55;
+    }
+
+    /* ==========================================================================
+       VISUAL 3: Obligation Timeline
+       ========================================================================== */
+    .timeline-container {
+      padding: 20px;
+      max-height: 540px;
+      overflow-y: auto;
+    }
+    .timeline-track {
+      position: relative;
+      padding-left: 28px;
+      list-style: none;
+    }
+    .timeline-track::before {
+      content: '';
+      position: absolute;
+      left: 7px;
+      top: 8px;
+      bottom: 8px;
+      width: 2px;
+      background: var(--border);
+    }
+    .timeline-node {
+      position: relative;
+      margin-bottom: 24px;
+    }
+    .timeline-node:last-child {
+      margin-bottom: 0;
+    }
+    .timeline-node::before {
+      content: '';
+      position: absolute;
+      left: -25px;
+      top: 6px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      border: 2px solid var(--node-color, var(--accent-blue));
+      background: var(--bg-primary);
+      box-shadow: 0 0 10px var(--node-color, var(--accent-blue));
+    }
+    .timeline-deadline {
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+    }
+    .timeline-node-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 14px 16px;
+    }
+    .timeline-node-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .timeline-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    .timeline-desc {
+      font-size: 0.84rem;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
+    /* ==========================================================================
+       VISUAL 4: Clause Battle
+       ========================================================================== */
+    .battle-container {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .battle-scores-strip {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 32px;
+      padding: 20px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+    }
+    .battle-score-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+    .battle-score-title {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .battle-score-val {
+      font-family: var(--font-display);
+      font-size: 2.4rem;
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+    }
+    .battle-score-tag {
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .battle-table-wrapper {
+      width: 100%;
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+    }
+    .battle-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.86rem;
+    }
+    .battle-table th {
+      background: var(--bg-elevated);
+      color: var(--text-secondary);
+      font-weight: 500;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 12px 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    .battle-table td {
+      padding: 14px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+      color: var(--text-primary);
+    }
+    .battle-table tr:last-child td {
+      border-bottom: none;
+    }
+    .battle-table tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+    .battle-source-muted {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+    .battle-winner-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-weight: 600;
+      font-size: 0.78rem;
+      padding: 2px 8px;
+      border-radius: 100px;
+      background: rgba(255, 255, 255, 0.04);
+    }
+    .battle-verdict-strip {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent-green);
+      border-radius: var(--radius-md);
+      padding: 16px 20px;
+    }
+    .battle-verdict-strip.tie {
+      border-left-color: var(--accent-amber);
+    }
+    .battle-verdict-title {
+      font-size: 0.92rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+    .battle-verdict-note {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    /* ==========================================================================
+       Red Flags Strip
+       ========================================================================== */
+    .red-flags-strip {
+      max-width: 1100px;
+      margin: 0 auto 32px;
+    }
+    .red-flags-list {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .red-flag-item {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 16px;
+    }
+    .red-flag-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+    .red-flag-title-text {
+      font-size: 0.92rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    .red-flag-desc {
+      font-size: 0.86rem;
+      color: var(--text-secondary);
+      line-height: 1.55;
+    }
+
+    /* ==========================================================================
+       Lawyer Prep CTA Strip & Consult Card
+       ========================================================================== */
+    .lawyer-prep-cta {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    .lawyer-cta-card {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 28px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    }
+    @media (max-width: 768px) {
+      .lawyer-cta-card {
+        flex-direction: column;
+        align-items: flex-start;
+        padding: 20px;
+      }
+      .lawyer-cta-btn {
+        width: 100% !important;
+      }
+    }
+    .lawyer-cta-content {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+    }
+    .lawyer-cta-icon-wrapper {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, rgba(91,141,239,0.2) 0%, rgba(91,141,239,0.05) 100%);
+      border: 1px solid rgba(91, 141, 239, 0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .lawyer-cta-heading {
+      font-family: var(--font-display);
+      font-size: 1.45rem;
+      color: var(--text-primary);
+      font-weight: 400;
+      margin-bottom: 4px;
+    }
+    .lawyer-cta-text {
+      color: var(--text-secondary);
+      font-size: 0.88rem;
+      line-height: 1.5;
+      max-width: 600px;
+    }
+    .lawyer-cta-btn {
+      width: auto !important;
+      white-space: nowrap;
+      padding: 12px 24px;
+      flex-shrink: 0;
+    }
+
+    /* Consult Card */
+    .consult-card {
+      border-top: 3px solid var(--accent-amber);
+      padding: 40px 32px;
+      text-align: center;
+      max-width: 680px;
+      margin: 40px auto;
+      grid-column: 1 / -1;
+    }
+    .consult-icon {
+      font-size: 2.8rem;
+      margin-bottom: 16px;
+    }
+    .consult-title {
+      font-family: var(--font-display);
+      font-size: 1.8rem;
+      color: var(--text-primary);
+      margin-bottom: 12px;
+    }
+    .consult-reason {
+      color: var(--text-secondary);
+      line-height: 1.6;
+      margin-bottom: 24px;
+      font-size: 0.92rem;
+    }
+    .consult-findings {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 16px 20px;
+      text-align: left;
+      margin-bottom: 28px;
+    }
+    .consult-findings-title {
+      font-size: 0.84rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+    }
+    .consult-findings li {
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      margin-bottom: 6px;
+      list-style: none;
+      padding-left: 4px;
+    }
+    .consult-findings li::before {
+      content: '•';
+      color: var(--accent-amber);
+      margin-right: 8px;
+    }
+    .consult-note {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-top: 16px;
+      font-style: italic;
+    }
+
+    /* Lawyer Prep Panel */
+    .lawyer-prep-panel {
+      max-width: 1100px;
+      margin: 28px auto 0;
+    }
+    .lp-panel-card {
+      padding: 32px 36px;
+    }
+    @media (max-width: 768px) {
+      .lp-panel-card {
+        padding: 20px 16px;
+      }
+    }
+    .lp-section-header {
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      margin: 28px 0 12px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border);
+    }
+    .lp-summary-text {
+      color: var(--text-primary);
+      font-size: 0.92rem;
+      line-height: 1.7;
+    }
+    .lp-red-flags-list, .lp-questions-list, .lp-negotiations-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .lp-red-flag-item, .lp-negotiation-item {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 14px 16px;
+    }
+    .lp-red-flag-header, .lp-negotiation-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+      color: var(--text-primary);
+      font-size: 0.92rem;
+      margin-bottom: 4px;
+    }
+    .lp-ask-lawyer {
+      font-style: italic;
+      color: var(--accent-blue);
+      font-size: 0.86rem;
+      line-height: 1.5;
+    }
+    .lp-question {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px 16px;
+      cursor: pointer;
+      transition: background-color 0.2s cubic-bezier(0.32, 0.72, 0, 1),
+                  border-color 0.2s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+    .lp-question:hover {
+      background: rgba(91, 141, 239, 0.05);
+      border-color: rgba(91, 141, 239, 0.25);
+    }
+    .lp-question input[type="checkbox"] {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border: 1.5px solid var(--text-muted);
+      border-radius: 4px;
+      background: var(--bg-primary);
+      cursor: pointer;
+      display: grid;
+      place-content: center;
+      margin-top: 2px;
+      flex-shrink: 0;
+      transition: all 0.2s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+    .lp-question input[type="checkbox"]:checked {
+      background: var(--accent-blue);
+      border-color: var(--accent-blue);
+    }
+    .lp-question input[type="checkbox"]:checked::after {
+      content: '✓';
+      color: #fff;
+      font-size: 11px;
+      font-weight: bold;
+    }
+    .lp-question span {
+      font-size: 0.88rem;
+      color: var(--text-primary);
+      line-height: 1.5;
+    }
+    .lp-negotiation-clause {
+      font-size: 0.75rem;
+      font-weight: normal;
+      color: var(--text-muted);
+      margin-left: 4px;
+    }
+    .lp-negotiation-desc {
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      line-height: 1.5;
+    }
+    .lp-jurisdiction-box {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px 16px;
+      color: var(--text-secondary);
+      font-size: 0.88rem;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .lp-disclaimer {
+      margin-top: 32px;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      border-top: 1px solid var(--border);
+      padding-top: 14px;
+      text-align: center;
+    }
+
+    .btn-spinner-inline {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 36px 20px;
+      color: var(--text-secondary);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+    .empty-state .material-symbols-outlined {
+      font-size: 32px;
+      color: var(--accent-blue);
+    }
+
+    /* ==========================================================================
+       Fixed Bottom Disclaimer Bar (Always Visible - Step 4)
+       ========================================================================== */
+    #disclaimer-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 48px;
+      z-index: 200; /* always above all screens */
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 24px;
+      background: rgba(14, 14, 20, 0.85);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-top: 1px solid var(--border);
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      text-align: left;
+    }
+    #disclaimer-bar .material-symbols-outlined {
+      font-size: 18px;
+      color: var(--accent-blue);
+      flex-shrink: 0;
+    }
+    .disclaimer-powered {
+      margin-left: auto;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+    .google-g {
+      color: var(--accent-blue);
+      font-weight: 700;
+    }
+
+    /* ==========================================================================
+       Print Styles
+       ========================================================================== */
+    @media print {
+      #screen-apikey,
+      #screen-input,
+      #screen-loading,
+      #results-header,
+      #visuals-grid,
+      #red-flags-strip,
+      #lawyer-prep-cta,
+      #lawyer-prep-cta button,
+      #disclaimer-bar,
+      .btn-ghost,
+      .lp-header button,
+      body::before {
+        display: none !important;
+      }
+
+      body {
+        background: #fff !important;
+        color: #000 !important;
+        padding-bottom: 0 !important;
+      }
+
+      #screen-results,
+      .results-content-container {
+        display: block !important;
+        padding: 0 !important;
+        margin: 0 !important;
+      }
+
+      #lawyer-prep-panel,
+      .lawyer-prep-panel {
+        display: block !important;
+        color: #000 !important;
+        background: #fff !important;
+        font-family: Georgia, serif;
+        max-width: 700px;
+        margin: 0 auto;
+        padding: 40px 20px;
+      }
+
+      .lp-panel-card {
+        background: #fff !important;
+        border: none !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+        color: #000 !important;
+      }
+
+      .lp-title {
+        color: #000 !important;
+        font-size: 1.6rem !important;
+      }
+
+      .lp-section-header {
+        color: #444 !important;
+        border-bottom: 1px solid #ccc !important;
+      }
+
+      .lp-summary-text,
+      .lp-question span,
+      .lp-negotiation-desc,
+      .lp-red-flag-header,
+      .lp-negotiation-header {
+        color: #000 !important;
+      }
+
+      .lp-red-flag-item,
+      .lp-question,
+      .lp-negotiation-item,
+      .lp-jurisdiction-box {
+        background: #f9f9f9 !important;
+        border: 1px solid #eee !important;
+        break-inside: avoid;
+      }
+
+      .lp-ask-lawyer {
+        color: #1a4f9c !important;
+      }
+
+      .source-detail {
+        display: none !important;
+      }
+
+      .lp-disclaimer {
+        margin-top: 40px;
+        font-size: 0.75rem;
+        color: #666 !important;
+        border-top: 1px solid #ccc !important;
+        padding-top: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Main Application Container -->
+  <main role="main">
+    <div id="app">
+      <!-- Screen 2: Document Input Screen -->
+      <div id="screen-input">
+        <!-- Error Banner -->
+        <div id="error-banner" class="error-banner" role="alert" aria-live="assertive" aria-atomic="true" tabindex="-1" hidden>
+          <span id="error-banner-text"></span>
+          <button type="button" id="btn-dismiss-banner" class="btn-dismiss-banner" aria-label="Dismiss error banner">
+            <span class="material-symbols-outlined" aria-hidden="true">close</span>
+          </button>
+        </div>
+
+        <!-- Floating Glass Header Bar -->
+        <header id="input-header" class="input-header">
+          <div class="header-logo">
+            <span class="logo-lex">Lex</span><span class="logo-guard">Guard</span>
+          </div>
+          <!-- Settings trigger button — add to input screen header -->
+          <button id="btn-settings"
+                  aria-label="API Key Settings"
+                  aria-expanded="false"
+                  aria-controls="settings-panel">
+            <span class="material-symbols-outlined" aria-hidden="true">settings</span>
+            <span id="settings-status-dot" class="status-dot status-dot--empty"></span>
+          </button>
+        </header>
+
+        <!-- Inline settings panel — add directly below header bar -->
+        <div id="settings-panel"
+             role="region"
+             aria-label="API Key Settings"
+             hidden>
+
+          <div class="settings-panel-inner">
+
+            <div class="settings-row">
+              <label for="api-key-input" class="settings-label">
+                <span class="material-symbols-outlined" aria-hidden="true">key</span>
+                Gemini API Key
+              </label>
+              <a href="https://aistudio.google.com/app/apikey"
+                 target="_blank"
+                 rel="noopener noreferrer"
+                 class="settings-link">
+                Get free key →
+              </a>
+            </div>
+
+            <div class="settings-input-row">
+              <input type="password"
+                     id="api-key-input"
+                     autocomplete="off"
+                     spellcheck="false"
+                     placeholder="Paste your Gemini API key"
+                     aria-describedby="api-key-error"/>
+              <button id="btn-key-toggle"
+                      aria-label="Show API key"
+                      type="button">
+                <span class="material-symbols-outlined" aria-hidden="true">visibility</span>
+              </button>
+              <button id="btn-key-save"
+                      type="button"
+                      aria-label="Save API key">
+                Save
+              </button>
+            </div>
+
+            <div id="api-key-error"
+                 role="alert"
+                 class="settings-error"
+                 hidden></div>
+
+            <div id="api-key-saved-msg"
+                 class="settings-saved"
+                 hidden>
+              <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
+              Key saved for this session
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Mode Toggle -->
+        <div class="mode-toggle-container">
+          <div class="mode-toggle-pills" role="radiogroup" aria-label="Document Mode">
+            <button
+              type="button"
+              id="mode-single"
+              class="mode-pill active"
+              role="radio"
+              aria-checked="true"
+              aria-label="Single Document mode"
+            >
+              Single Document
+            </button>
+            <button
+              type="button"
+              id="mode-compare"
+              class="mode-pill"
+              role="radio"
+              aria-checked="false"
+              aria-label="Compare Two Documents mode"
+            >
+              Compare Two Documents
+            </button>
+          </div>
+        </div>
+
+        <!-- Document Input Form (Double-Bezel Textareas) -->
+        <form id="form-documents" onsubmit="event.preventDefault(); handleAnalyzeSubmit();" novalidate>
+          <div class="docs-grid" id="docs-grid">
+            <!-- Document A Pane -->
+            <div class="doc-pane" id="pane-doc-a">
+              <label for="doc-a" id="label-doc-a" class="form-label">Paste your legal document</label>
+              <div class="doc-input-outer">
+                <textarea
+                  id="doc-a"
+                  class="doc-textarea form-textarea"
+                  placeholder="Paste any legal document — contract, agreement, offer letter, NDA, lease, policy..."
+                  aria-describedby="doc-a-error"
+                  spellcheck="false"
+                ></textarea>
+              </div>
+              <div id="doc-a-error" class="form-error" role="alert" aria-live="polite"></div>
+            </div>
+
+            <!-- Document B Pane (Hidden by default in Single Document mode) -->
+            <div class="doc-pane" id="pane-doc-b" hidden>
+              <label for="doc-b" id="label-doc-b" class="form-label">Document B</label>
+              <div class="doc-input-outer">
+                <textarea
+                  id="doc-b"
+                  class="doc-textarea form-textarea"
+                  placeholder="Paste second legal document to compare..."
+                  aria-describedby="doc-b-error"
+                  spellcheck="false"
+                ></textarea>
+              </div>
+              <div id="doc-b-error" class="form-error" role="alert" aria-live="polite"></div>
+            </div>
+          </div>
+
+          <!-- Analyze Action Button with Button-in-Button Pattern -->
+          <button type="submit" id="btn-analyze" class="btn-primary" aria-label="Analyze Document">
+            <span>Analyze Document</span>
+            <span class="btn-icon-wrap" aria-hidden="true">
+              <span class="material-symbols-outlined" style="font-size: 18px;">search</span>
+            </span>
+          </button>
+        </form>
+      </div>
+
+      <!-- Screen 3: Loading Screen (Ethereal Orb) -->
+      <div id="screen-loading">
+        <div class="header-logo" style="margin-bottom: 32px;">
+          <span class="logo-lex">Lex</span><span class="logo-guard">Guard</span>
+        </div>
+        <div class="pulse-ring-container">
+          <div class="loading-orb">
+            <span class="material-symbols-outlined" style="font-size: 36px; color: var(--accent-blue);" aria-hidden="true">balance</span>
+          </div>
+        </div>
+        <p id="loading-status" role="status" aria-live="polite" aria-atomic="true">Reading your document...</p>
+      </div>
+
+      <!-- Screen 4: Results Screen -->
+      <div id="screen-results">
+        <!-- Floating Glass Top Bar -->
+        <header id="results-header">
+          <div class="results-header-inner">
+            <!-- Left: LexGuard logo -->
+            <div class="header-logo">
+              <span class="logo-lex">Lex</span><span class="logo-guard">Guard</span>
+            </div>
+            <!-- Center: doc_type badge + complexity pill -->
+            <div class="results-meta-badges">
+              <span id="badge-doc-type" class="badge-doc-type"></span>
+              <span id="badge-complexity" class="badge-complexity"></span>
+            </div>
+            <!-- Right: "Analyze New Document" button -->
+            <button type="button" id="btn-new-doc" class="btn-ghost" aria-label="Analyze New Document">
+              <span class="material-symbols-outlined" aria-hidden="true" style="font-size: 16px;">refresh</span>
+              <span>New Document</span>
+            </button>
+          </div>
+        </header>
+
+        <!-- Main Results Container -->
+        <div class="results-content-container">
+          <!-- Document summary strip -->
+          <div id="results-summary" class="results-summary-strip reveal" aria-live="polite">
+            <span class="material-symbols-outlined summary-icon" aria-hidden="true">description</span>
+            <p id="results-summary-text" class="results-summary-text"></p>
+          </div>
+
+          <!-- Two visuals side by side (stack on mobile) -->
+          <div id="visuals-grid" class="visuals-grid">
+            <div id="visual-slot-1" class="visual-slot"></div>
+            <div id="visual-slot-2" class="visual-slot"></div>
+          </div>
+
+          <!-- Red flags strip — always shown if present -->
+          <div id="red-flags-strip" class="red-flags-strip"></div>
+
+          <!-- Lawyer prep CTA — always shown -->
+          <div id="lawyer-prep-cta" class="lawyer-prep-cta reveal"></div>
+
+          <!-- Lawyer prep briefing panel — rendered on demand -->
+          <div id="lawyer-prep-panel" class="lawyer-prep-panel" hidden></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Always-Visible Disclaimer Bar -->
+  <footer id="disclaimer-bar" role="contentinfo">
+    <span class="material-symbols-outlined" aria-hidden="true">balance</span>
+    <span>
+      <strong>LexGuard</strong> provides legal information only — not legal advice. Always consult a qualified lawyer before making legal decisions.
+    </span>
+    <span class="disclaimer-powered">
+      Powered by <span class="google-g" aria-label="Google">G</span>oogle Gemini
+    </span>
+  </footer>
+
+  <!-- Screen Switching & Interaction Logic (Functionality Unchanged) -->
+  <script>
+    // ── App readiness flag ────────────────────────────────
+    let appReady = false;
+
+    /**
+     * Initializes app — pings server and loads Firebase config.
+     * No secrets ever stored in frontend variables.
+     */
+    async function initApp() {
+      try {
+        // Step 1 — confirm server is running
+        const pingRes = await fetch('/api/ping');
+        if (!pingRes.ok) throw new Error('Server unreachable');
+        const ping = await pingRes.json();
+        if (!ping.ok) throw new Error('Server not ready');
+
+        // Step 2 — fetch Firebase config from server
+        const configRes = await fetch('/api/config');
+        if (!configRes.ok) throw new Error('Config unavailable');
+        const firebaseConfig = await configRes.json();
+
+        // Step 3 — initialize Firebase with fetched config
+        if (typeof window.initFirebase === 'function') {
+          await window.initFirebase(firebaseConfig);
+        }
+
+        appReady = true;
+
+      } catch (e) {
+        console.error('Init failed:', e.message);
+        showStartupError();
+      }
+    }
+
+    /**
+     * Shows a non-dismissable startup error when server is unreachable.
+     * Never mentions API key to the user — purely a dev/ops message.
+     */
+    function showStartupError() {
+      // Replace entire app content with clear error state
+      document.getElementById('app').innerHTML = `
+        <div style="
+          min-height: 100dvh;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-family: var(--font-body);
+          background: var(--bg-primary);
+          padding: 24px;
+        ">
+          <div style="
+            background: var(--bg-surface);
+            border: 1px solid var(--border-strong);
+            border-top: 3px solid var(--accent-red);
+            border-radius: 20px;
+            padding: 40px 36px;
+            max-width: 420px;
+            text-align: center;
+          ">
+            <span class="material-symbols-outlined"
+                  style="font-size:2.5rem;color:var(--accent-red)"
+                  aria-hidden="true">wifi_off</span>
+            <h2 style="
+              font-family: var(--font-display);
+              color: var(--text-primary);
+              margin: 16px 0 10px;
+              font-size: 1.4rem;
+            ">LexGuard is not reachable</h2>
+            <p style="
+              color: var(--text-secondary);
+              font-size: 0.875rem;
+              line-height: 1.6;
+              margin: 0 0 24px;
+            ">
+              The application server is not running.<br>
+              Please start it and refresh this page.
+            </p>
+            <div style="
+              background: var(--bg-elevated);
+              border-radius: 10px;
+              padding: 14px 16px;
+              text-align: left;
+              font-size: 0.8rem;
+              color: var(--text-secondary);
+              font-family: monospace;
+              line-height: 1.8;
+            ">
+              $ npm start<br>
+              $ open http://localhost:3000
+            </div>
+            <button onclick="location.reload()" style="
+              margin-top: 20px;
+              background: var(--accent-blue);
+              border: none;
+              border-radius: 10px;
+              padding: 12px 24px;
+              color: #fff;
+              font-family: var(--font-body);
+              font-size: 0.875rem;
+              font-weight: 500;
+              cursor: pointer;
+              width: 100%;
+            ">
+              Retry
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    // ==========================================================================
+    // PART 1: Global Error Handlers
+    // ==========================================================================
+    window.addEventListener('unhandledrejection', (e) => {
+      e.preventDefault();
+      // Never surface raw error to user
+      showErrorBanner('Something went wrong. Please try again.');
+    });
+
+    window.addEventListener('error', (e) => {
+      e.preventDefault();
+      // Silent — no raw JS errors exposed to user
+    });
+
+    // ==========================================================================
+    // Safe Storage Wrapper with in-memory fallback for local file:// execution
+    // ==========================================================================
+    const safeStorage = {
+      _data: {},
+      getItem(key) {
+        try {
+          if (window.sessionStorage) {
+            const val = window.sessionStorage.getItem(key);
+            if (val !== null && val !== undefined) return val;
+          }
+        } catch (e) {}
+        return this._data[key] !== undefined ? this._data[key] : null;
+      },
+      setItem(key, val) {
+        try {
+          if (window.sessionStorage) {
+            window.sessionStorage.setItem(key, val);
+          }
+        } catch (e) {}
+        this._data[key] = String(val);
+      },
+      removeItem(key) {
+        try {
+          if (window.sessionStorage) {
+            window.sessionStorage.removeItem(key);
+          }
+        } catch (e) {}
+        delete this._data[key];
+      },
+      clear() {
+        try {
+          if (window.sessionStorage) {
+            window.sessionStorage.clear();
+          }
+        } catch (e) {}
+        this._data = {};
+      }
+    };
+
+    // ==========================================================================
+    // Tab Close Cleanup
+    // ==========================================================================
+    window.addEventListener('beforeunload', () => {
+      safeStorage.removeItem('lgKey');
+      safeStorage.removeItem('lgDocA');
+      safeStorage.removeItem('lgDocB');
+    });
+
+    // ==========================================================================
+    // Error Banner & Status Helpers
+    // ==========================================================================
+    let errorBannerTimeout = null;
+
+    /** Displays accessible error notification banner. */
+    function showErrorBanner(message) {
+      const banner = document.getElementById('error-banner');
+      const msg = document.getElementById('error-banner-text');
+      if (!banner || !msg) return;
+
+      msg.textContent = message; // textContent — never innerHTML
+      banner.hidden = false;
+      banner.focus(); // move focus for screen readers
+
+      if (errorBannerTimeout) clearTimeout(errorBannerTimeout);
+      errorBannerTimeout = setTimeout(() => {
+        banner.hidden = true;
+      }, 6000);
+    }
+
+    document.getElementById('btn-dismiss-banner')?.addEventListener('click', () => {
+      const banner = document.getElementById('error-banner');
+      if (banner) banner.hidden = true;
+      if (errorBannerTimeout) clearTimeout(errorBannerTimeout);
+    });
+
+    /** Asserts browser is online before initiating API calls. */
+    function assertOnline() {
+      if (!navigator.onLine) {
+        showErrorBanner('No internet connection. Please check your network.');
+        throw new Error('offline');
+      }
+    }
+
+    /** Maps HTTP status codes to user-friendly error messages. */
+    function geminiErrorMessage(status) {
+      const map = {
+        400: 'Invalid request. Please check your document and try again.',
+        401: 'API key rejected. Please re-enter a valid Gemini API key.',
+        403: 'API key does not have permission. Check your Google AI Studio settings.',
+        429: 'Usage limit reached. Try again tomorrow or use a different API key.',
+        500: 'Gemini service error. Please try again in a moment.',
+        503: 'Gemini is temporarily unavailable. Please try again shortly.',
+      };
+      return map[status] || 'Unexpected error. Please try again.';
+    }
+
+    /** Cleans dynamic analysis state when returning to input screen for retry. */
+    function resetForRetry() {
+      safeStorage.removeItem('lgClassification');
+      safeStorage.removeItem('lgAnalysis');
+      safeStorage.removeItem('lgVisuals');
+      const s1 = document.getElementById('visual-slot-1');
+      const s2 = document.getElementById('visual-slot-2');
+      const flags = document.getElementById('red-flags-strip');
+      const cta = document.getElementById('lawyer-prep-cta');
+      const panel = document.getElementById('lawyer-prep-panel');
+      if (s1) s1.innerHTML = '';
+      if (s2) s2.innerHTML = '';
+      if (flags) {
+        flags.innerHTML = '';
+        flags.hidden = true;
+      }
+      if (cta) cta.innerHTML = '';
+      if (panel) {
+        panel.innerHTML = '';
+        panel.hidden = true;
+      }
+    }
+
+    /** Switches visible screen and manages focus for accessibility (Step 6). */
+    function showScreen(id) {
+      if (id === 'screen-input') {
+        resetForRetry();
+      }
+
+      // Hide all screens
+      document.querySelectorAll('[id^="screen-"]').forEach(s => {
+        s.classList.remove('screen-active');
+        s.setAttribute('aria-hidden', 'true');
+        // Wait for fade out then hide
+        setTimeout(() => {
+          if (!s.classList.contains('screen-active')) {
+            s.style.display = 'none';
+          }
+        }, 300);
+      });
+
+      // Show target
+      const target = document.getElementById(id);
+      if (!target) return;
+
+      // Set correct display type per screen
+      const displayType = (id === 'screen-loading') ? 'flex' : 'block';
+      target.style.display = displayType;
+      target.removeAttribute('aria-hidden');
+      target.scrollTop = 0;
+
+      // Trigger fade in on next frame
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          target.classList.add('screen-active');
+        });
+      });
+
+      // Focus management
+      setTimeout(() => {
+        const focusTarget = target.querySelector(
+          'h1, h2, [role="heading"], input, button, [tabindex="0"]'
+        );
+        if (focusTarget) {
+          focusTarget.setAttribute('tabindex', '-1');
+          focusTarget.focus({ preventScroll: true });
+        }
+      }, 320);
+    }
+
+    // ==========================================================================
+    // IntersectionObserver Scroll Reveal Logic
+    // ==========================================================================
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.08 });
+
+    function observeRevealTargets() {
+      document.querySelectorAll('.reveal').forEach((el, index) => {
+        if (!el.classList.contains('revealed')) {
+          el.style.transitionDelay = (index * 60) + 'ms';
+          revealObserver.observe(el);
+        }
+      });
+    }
+
+    function addRevealClasses() {
+      document.querySelectorAll('.visual-card, .timeline-node, .red-flag-item, .battle-table tr, .lp-red-flag-item, .lp-question, .lp-negotiation-item, .consult-card, .lawyer-cta-card, .results-summary-strip').forEach(el => {
+        if (!el.classList.contains('reveal')) {
+          el.classList.add('reveal');
+        }
+      });
+      observeRevealTargets();
+    }
+
+    // ==========================================================================
+    // Loading Status Message Cycler
+    // ==========================================================================
+    let loadingInterval = null;
+
+    function startLoadingCycle() {
+      const messages = [
+        'Reading your document...',
+        'Identifying document type...',
+        'Running legal analysis...',
+        'Preparing your results...',
+      ];
+      let i = 0;
+      const el = document.getElementById('loading-status');
+      if (!el) return;
+      el.textContent = messages[0];
+      if (loadingInterval) clearInterval(loadingInterval);
+      loadingInterval = setInterval(() => {
+        i = (i + 1) % messages.length;
+        el.textContent = messages[i];
+      }, 3000);
+    }
+
+    function stopLoadingCycle() {
+      if (loadingInterval) {
+        clearInterval(loadingInterval);
+        loadingInterval = null;
+      }
+    }
+
+    // ==========================================================================
+    // Helpers: Document Sanitization, HTML Escaping, Empty Guard
+    // ==========================================================================
+    /** Sanitizes document input text before storing or sending to prompt. */
+    function sanitizeDoc(text) {
+      return String(text)
+        .replace(/[<>]/g, '')   // strip angle brackets
+        .trim()
+        .slice(0, 60000);        // hard cap
+    }
+
+    /** Sanitizes all user-facing strings from API responses. */
+    function safe(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    /** Guards against empty arrays/data before rendering a visual component. */
+    function guardEmpty(data, fieldName, visualName) {
+      if (!data || !data[fieldName] || data[fieldName].length === 0) {
+        return `<div class="empty-state">
+          <span class="material-symbols-outlined" aria-hidden="true">info</span>
+          <p>No ${visualName} data found in this document.</p>
+        </div>`;
+      }
+      return null;
+    }
+
+    function getNextVisualSlot() {
+      const s1 = document.getElementById('visual-slot-1');
+      const s2 = document.getElementById('visual-slot-2');
+      if (s1 && (!s1.hasChildNodes() || s1.innerHTML.trim() === '')) return s1;
+      return s2;
+    }
+
+    // ==========================================================================
+    // SCREEN 2: Document Input Logic
+    // ==========================================================================
+    let currentMode = 'single'; // 'single' | 'compare'
+
+    const modeSingleBtn = document.getElementById('mode-single');
+    const modeCompareBtn = document.getElementById('mode-compare');
+    const docsGrid = document.getElementById('docs-grid');
+    const paneDocB = document.getElementById('pane-doc-b');
+    const labelDocA = document.getElementById('label-doc-a');
+    const docAInput = document.getElementById('doc-a');
+    const docBInput = document.getElementById('doc-b');
+    const docAError = document.getElementById('doc-a-error');
+    const docBError = document.getElementById('doc-b-error');
+    const btnAnalyze = document.getElementById('btn-analyze');
+
+    // Mode Switching
+    function setMode(mode) {
+      currentMode = mode;
+      if (docAError) docAError.textContent = '';
+      if (docBError) docBError.textContent = '';
+
+      if (mode === 'single') {
+        if (modeSingleBtn) {
+          modeSingleBtn.classList.add('active');
+          modeSingleBtn.setAttribute('aria-checked', 'true');
+        }
+        if (modeCompareBtn) {
+          modeCompareBtn.classList.remove('active');
+          modeCompareBtn.setAttribute('aria-checked', 'false');
+        }
+
+        if (docsGrid) docsGrid.classList.remove('compare-mode');
+        if (paneDocB) paneDocB.hidden = true;
+        if (labelDocA) labelDocA.textContent = 'Paste your legal document';
+      } else {
+        if (modeCompareBtn) {
+          modeCompareBtn.classList.add('active');
+          modeCompareBtn.setAttribute('aria-checked', 'true');
+        }
+        if (modeSingleBtn) {
+          modeSingleBtn.classList.remove('active');
+          modeSingleBtn.setAttribute('aria-checked', 'false');
+        }
+
+        if (docsGrid) docsGrid.classList.add('compare-mode');
+        if (paneDocB) paneDocB.hidden = false;
+        if (labelDocA) labelDocA.textContent = 'Document A';
+        window._lg?.recordEvent('compare_mode_used');
+      }
+    }
+
+    if (modeSingleBtn) modeSingleBtn.addEventListener('click', () => setMode('single'));
+    if (modeCompareBtn) modeCompareBtn.addEventListener('click', () => setMode('compare'));
+
+    // Listen for <details class="source-detail"> toggle
+    document.addEventListener('toggle', (e) => {
+      if (e.target.classList && e.target.classList.contains('source-detail') && e.target.open) {
+        window._lg?.recordEvent('source_expanded');
+      }
+    }, true);
+
+    // Clear Errors on input / keydown
+    if (docAInput && docAError) docAInput.addEventListener('keydown', () => { docAError.textContent = ''; });
+    if (docBInput && docBError) docBInput.addEventListener('keydown', () => { docBError.textContent = ''; });
+
+    // Handle Document Validation & Analysis
+    function handleAnalyzeSubmit() {
+      if (!appReady) {
+        showErrorBanner('Server not reachable. Please refresh.');
+        return;
+      }
+
+      let hasError = false;
+
+      // Validate Document A
+      const valA = (docAInput ? docAInput.value : '').trim();
+      if (!valA) {
+        if (docAError) docAError.textContent = 'Please paste a document to analyze';
+        hasError = true;
+      } else if (valA.length < 200) {
+        if (docAError) docAError.textContent = 'Document seems too short. Please paste the full text.';
+        hasError = true;
+      } else if (valA.length > 60000) {
+        if (docAError) docAError.textContent = 'Document too large. Paste the key sections only.';
+        hasError = true;
+      } else {
+        if (docAError) docAError.textContent = '';
+      }
+
+      // Validate Document B in compare mode
+      let valB = '';
+      if (currentMode === 'compare') {
+        valB = (docBInput ? docBInput.value : '').trim();
+        if (!valB) {
+          if (docBError) docBError.textContent = 'Please paste a document to analyze';
+          hasError = true;
+        } else if (valB.length < 200) {
+          if (docBError) docBError.textContent = 'Document seems too short. Please paste the full text.';
+          hasError = true;
+        } else if (valB.length > 60000) {
+          if (docBError) docBError.textContent = 'Document too large. Paste the key sections only.';
+          hasError = true;
+        } else {
+          if (docBError) docBError.textContent = '';
+        }
+      }
+
+      if (hasError) return;
+
+      // Save sanitized values to safeStorage
+      safeStorage.setItem('lgDocA', sanitizeDoc(valA));
+      if (currentMode === 'compare') {
+        safeStorage.setItem('lgDocB', sanitizeDoc(valB));
+      } else {
+        safeStorage.removeItem('lgDocB');
+      }
+      safeStorage.setItem('lgMode', currentMode);
+
+      // Transition to loading & run classification
+      showScreen('screen-loading');
+      runClassification();
+    }
+
+    // ==========================================================================
+    // SCREEN 3 & GEMINI CALL 1: Classification API Logic
+    // ==========================================================================
+    /** Classifies the document type and complexity via Gemini Call 1. */
+    async function runClassification() {
+      if (!appReady) {
+        showErrorBanner('Server not reachable. Please refresh.');
+        return;
+      }
+      assertOnline();
+      startLoadingCycle();
+      try {
+        const docA = sanitizeDoc(safeStorage.getItem('lgDocA') || '');
+        const isComparison = safeStorage.getItem('lgMode') === 'compare';
+        const docB = isComparison ? sanitizeDoc(safeStorage.getItem('lgDocB') || '') : '';
+
+        const docText = isComparison
+          ? `DOCUMENT A:\n${docA}\n\nDOCUMENT B:\n${docB}`
+          : docA;
+
+        const classificationPrompt = `Classify this legal document. Return JSON matching this schema exactly:
+{
+  "doc_type": string,         // e.g. "Employment Contract", "NDA", "Lease Agreement"
+  "complexity": "low" | "medium" | "high",
+  "is_comparison": boolean,   // true if user submitted two documents
+  "primary_concern": "risk" | "obligations" | "rights" | "comparison" | "ambiguity",
+  "secondary_concern": "risk" | "obligations" | "rights" | "comparison" | "ambiguity" | null,
+  "consult_lawyer": boolean,  // true if doc is too ambiguous or incomplete to analyze
+  "consult_reason": string | null
+}
+
+RULES:
+- Only classify based on what is present in the document.
+- If document is too short, unclear, or not a legal document, set consult_lawyer: true.
+- Never guess beyond what the text contains.
+
+DOCUMENT:
+${docText}`;
+
+        const requestBody = {
+          model: 'gemini-3.1-flash-lite',
+          system_instruction: {
+            parts: [{
+              text: `You are a legal document classifier. \nRespond ONLY in valid JSON. No markdown. No explanation.`
+            }]
+          },
+          contents: [{
+            role: "user",
+            parts: [{ text: classificationPrompt }]
+          }],
+          generationConfig: {
+            responseMimeType: "application/json",
+            temperature: 0.1,
+            maxOutputTokens: 300
+          }
+        };
+
+        let response;
+        try {
+          response = await fetch('/api/gemini', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestBody)
+          });
+        } catch (networkErr) {
+          throw new Error('NETWORK_ERROR');
+        }
+
+        if (!response.ok) {
+          throw new Error(`STATUS_${response.status}`);
+        }
+
+        const data = await response.json();
+        const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!rawText) {
+          throw new Error('JSON_PARSE_FAIL');
+        }
+
+        let classification;
+        try {
+          classification = JSON.parse(rawText);
+        } catch (jsonErr) {
+          throw new Error('JSON_PARSE_FAIL');
+        }
+
+        safeStorage.setItem('lgClassification', JSON.stringify(classification));
+
+        if (classification.consult_lawyer === true) {
+          stopLoadingCycle();
+          renderConsultCard(classification.consult_reason || "This document requires human legal review.");
+        } else {
+          runAnalysis(classification);
+        }
+
+      } catch (e) {
+        stopLoadingCycle();
+        if (e.message === 'offline') return;
+
+        if (e.message === 'JSON_PARSE_FAIL') {
+          renderConsultCard("Document could not be processed. Please consult a lawyer.");
+          return;
+        }
+
+        let statusCode = 500;
+        const match = e.message.match(/STATUS_(\d+)/);
+        if (match) statusCode = parseInt(match[1], 10);
+
+        const errorMsg = (e.message === 'NETWORK_ERROR' || e.message.includes('network') || e.message.includes('Failed to fetch'))
+          ? 'No internet connection. Please check your network.'
+          : geminiErrorMessage(statusCode);
+
+        showScreen('screen-input');
+        showErrorBanner(errorMsg);
+      }
+    }
+
+    // ==========================================================================
+    // Analysis Schemas & Selection Logic
+    // ==========================================================================
+    const SCHEMA_RISK = `{
+  "doc_summary": "string — 2 sentences max",
+  "overall_score": number (0-100, 100 = highest risk),
+  "risk_categories": [
+    {
+      "name": "string",
+      "score": number (0-100),
+      "note": "string — one line",
+      "source_clause": "string — clause/section label from document",
+      "source_text": "string — exact sentence from document"
+    }
+  ],
+  "red_flags": [
+    {
+      "title": "string",
+      "severity": "low" | "medium" | "high",
+      "plain_english": "string",
+      "source_clause": "string",
+      "source_text": "string"
+    }
+  ],
+  "consult_lawyer": boolean,
+  "consult_reason": "string | null"
+}`;
+
+    const SCHEMA_TIMELINE = `{
+  "doc_summary": "string — 2 sentences max",
+  "obligations": [
+    {
+      "title": "string",
+      "deadline": "string",
+      "severity": "low" | "medium" | "high",
+      "plain_english": "string",
+      "source_clause": "string",
+      "source_text": "string"
+    }
+  ],
+  "risk_categories": [
+    {
+      "name": "string",
+      "score": number (0-100),
+      "note": "string",
+      "source_clause": "string",
+      "source_text": "string"
+    }
+  ],
+  "overall_score": number (0-100),
+  "consult_lawyer": boolean,
+  "consult_reason": "string | null"
+}`;
+
+    const SCHEMA_CLAUSES = `{
+  "doc_summary": "string — 2 sentences max",
+  "clauses": [
+    {
+      "title": "string",
+      "type": "obligation" | "right" | "risk" | "penalty" | "termination",
+      "flag": boolean,
+      "plain_english": "string",
+      "source_clause": "string",
+      "source_text": "string"
+    }
+  ],
+  "overall_score": number (0-100),
+  "consult_lawyer": boolean,
+  "consult_reason": "string | null"
+}`;
+
+    const SCHEMA_BATTLE = `{
+  "doc_summary": "string — 2 sentences comparing both documents",
+  "comparisons": [
+    {
+      "aspect": "string",
+      "doc_a": "string",
+      "doc_b": "string",
+      "doc_a_source": "string — clause label from Doc A",
+      "doc_b_source": "string — clause label from Doc B",
+      "winner": "A" | "B" | "tie",
+      "reason": "string — why this winner is better for the user"
+    }
+  ],
+  "overall_score_a": number (0-100, risk score),
+  "overall_score_b": number (0-100, risk score),
+  "consult_lawyer": boolean,
+  "consult_reason": "string | null"
+}`;
+
+    /** Selects exactly 2 visuals based on document classification. */
+    function selectVisuals(classification) {
+      const { primary_concern, is_comparison } = classification;
+
+      if (is_comparison) return ['battle', 'risk'];
+
+      const map = {
+        'obligations' : ['timeline', 'risk'],
+        'risk'        : ['risk', 'clauses'],
+        'rights'      : ['clauses', 'risk'],
+        'ambiguity'   : ['clauses', 'lawyer'],
+        'comparison'  : ['battle', 'risk'],
+      };
+
+      return map[primary_concern] || ['risk', 'clauses'];
+    }
+
+    function selectSchema(classification) {
+      if (classification.is_comparison) return SCHEMA_BATTLE;
+      const concern = classification.primary_concern;
+      if (concern === 'obligations') return SCHEMA_TIMELINE;
+      if (concern === 'risk')        return SCHEMA_RISK;
+      if (concern === 'rights')      return SCHEMA_CLAUSES;
+      if (concern === 'ambiguity')   return SCHEMA_CLAUSES;
+      return SCHEMA_RISK; // safe default
+    }
+
+    // ==========================================================================
+    // SCREEN 4 & GEMINI CALL 2: Deep Analysis API Logic
+    // ==========================================================================
+    /** Runs deep legal analysis via Gemini Call 2 based on classification. */
+    async function runAnalysis(classification) {
+      if (!appReady) {
+        showErrorBanner('Server not reachable. Please refresh.');
+        return;
+      }
+      assertOnline();
+      const analysisStart = Date.now();
+      try {
+        // Frontend Decides Visuals
+        const visuals = selectVisuals(classification);
+        safeStorage.setItem('lgVisuals', JSON.stringify(visuals));
+
+        // Schema Selection
+        const selectedSchema = selectSchema(classification);
+
+        const docType = classification.doc_type || 'Legal Document';
+        const docA = sanitizeDoc(safeStorage.getItem('lgDocA') || '');
+        const isComparison = classification.is_comparison || (safeStorage.getItem('lgMode') === 'compare');
+        const docB = isComparison ? sanitizeDoc(safeStorage.getItem('lgDocB') || '') : '';
+
+        const docBSection = (isComparison && docB) ? `DOCUMENT B:\n${docB}` : '';
+
+        const analysisPrompt = `Analyze this legal document. Document type: ${docType}.
+Return JSON matching this schema EXACTLY:
+${selectedSchema}
+
+RULES:
+- source_text must be copied verbatim from the document below.
+- If a field has no evidence in the document, omit the item.
+- overall_score: 0 = no risk, 100 = extreme risk.
+
+DOCUMENT A:
+${docA}
+
+${docBSection}`;
+
+        const requestBody = {
+          model: 'gemini-3.1-flash-lite',
+          system_instruction: {
+            parts: [{
+              text: `You are a legal document analyst. Respond ONLY in valid JSON.\nNo markdown. No explanation. No preamble.\nSTRICT RULES:\n- Every insight must include source_clause and source_text copied\n  verbatim from the document.\n- If you cannot find a direct source for a claim, omit that item\n  entirely and set consult_lawyer: true.\n- Never fabricate clause references.\n- Never give professional legal advice.\n- Be concise. No item should exceed 2 sentences.`
+            }]
+          },
+          contents: [{
+            role: "user",
+            parts: [{ text: analysisPrompt }]
+          }],
+          generationConfig: {
+            responseMimeType: "application/json",
+            temperature: 0.1,
+            maxOutputTokens: 1200
+          }
+        };
+
+        let response;
+        try {
+          response = await fetch('/api/gemini', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestBody)
+          });
+        } catch (networkErr) {
+          throw new Error('NETWORK_ERROR');
+        }
+
+        if (!response.ok) {
+          throw new Error(`STATUS_${response.status}`);
+        }
+
+        const data = await response.json();
+        const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!rawText) {
+          throw new Error('JSON_PARSE_FAIL');
+        }
+
+        let analysis;
+        try {
+          analysis = JSON.parse(rawText);
+        } catch (jsonErr) {
+          throw new Error('JSON_PARSE_FAIL');
+        }
+
+        safeStorage.setItem('lgAnalysis', JSON.stringify(analysis));
+
+        // Record analysis metadata
+        window._lg?.recordAnalysis(
+          classification,
+          JSON.parse(safeStorage.getItem('lgVisuals') || sessionStorage.getItem('lgVisuals') || '[]'),
+          analysis.consult_lawyer || false,
+          Date.now() - analysisStart
+        );
+
+        if (analysis.consult_lawyer === true) {
+          stopLoadingCycle();
+          renderConsultCard(analysis.consult_reason || "This document requires human legal review.");
+        } else {
+          stopLoadingCycle();
+          renderResults(analysis, classification);
+        }
+
+      } catch (e) {
+        stopLoadingCycle();
+        if (e.message === 'offline') return;
+
+        if (e.message === 'JSON_PARSE_FAIL') {
+          renderConsultCard("Analysis could not be completed. A lawyer's review is recommended.");
+          return;
+        }
+
+        let statusCode = 500;
+        const match = e.message.match(/STATUS_(\d+)/);
+        if (match) statusCode = parseInt(match[1], 10);
+
+        const errorMsg = (e.message === 'NETWORK_ERROR' || e.message.includes('network') || e.message.includes('Failed to fetch'))
+          ? 'No internet connection. Please check your network.'
+          : geminiErrorMessage(statusCode);
+
+        showScreen('screen-input');
+        showErrorBanner(errorMsg);
+      }
+    }
+
+    // ==========================================================================
+    // Results Screen Renderers & Visuals
+    // ==========================================================================
+
+    // SVG Score Arc Builder with Instrument Serif Tabular Numerals
+    function buildArc(score) {
+      const color = score >= 70 ? 'var(--accent-red)'
+                  : score >= 40 ? 'var(--accent-amber)'
+                  : 'var(--accent-green)';
+      const pct = Math.min(Math.max(score, 0), 100) / 100;
+      const r = 54, cx = 64, cy = 64;
+      const circ = 2 * Math.PI * r;
+      const dash = pct * circ * 0.75; // 270deg arc
+      return `
+        <svg width="128" height="128" viewBox="0 0 128 128"
+             role="img" aria-label="Risk score ${score} out of 100">
+          <circle cx="${cx}" cy="${cy}" r="${r}"
+            fill="none" stroke="var(--bg-elevated)"
+            stroke-width="8"
+            stroke-dasharray="${circ * 0.75} ${circ}"
+            stroke-dashoffset="0"
+            transform="rotate(135 ${cx} ${cy})"/>
+          <circle cx="${cx}" cy="${cy}" r="${r}"
+            fill="none" stroke="${color}"
+            stroke-width="8" stroke-linecap="round"
+            stroke-dasharray="${dash} ${circ}"
+            stroke-dashoffset="0"
+            transform="rotate(135 ${cx} ${cy})"/>
+          <text x="${cx}" y="${cy}" text-anchor="middle"
+            dominant-baseline="central"
+            fill="${color}" font-size="28"
+            class="risk-score-number"
+            font-family="var(--font-display)">${score}</text>
+        </svg>`;
+    }
+
+    /** Renders the risk meter SVG arc and category breakdown. */
+    function renderRiskMeter(analysis, targetSlot) {
+      const slot = targetSlot || getNextVisualSlot();
+      if (!slot) return;
+
+      const overallScore = typeof analysis.overall_score === 'number' ? analysis.overall_score : 50;
+      const scoreColor = overallScore >= 70 ? 'var(--accent-red)'
+                       : overallScore >= 40 ? 'var(--accent-amber)'
+                       : 'var(--accent-green)';
+      const levelLabel = overallScore >= 70 ? 'HIGH RISK'
+                       : overallScore >= 40 ? 'MODERATE RISK'
+                       : 'LOW RISK';
+
+      const categories = analysis.risk_categories || [];
+      let categoriesHtml = '';
+
+      if (categories.length > 0) {
+        categoriesHtml = `
+          <div class="risk-breakdown-heading">Category Breakdown</div>
+          <div class="risk-categories-list">
+            ${categories.map(cat => {
+              const score = typeof cat.score === 'number' ? cat.score : 0;
+              const catColor = score >= 70 ? 'var(--accent-red)'
+                             : score >= 40 ? 'var(--accent-amber)'
+                             : 'var(--accent-green)';
+              const sourceHtml = (cat.source_clause || cat.source_text) ? `
+                <details class="source-detail">
+                  <summary>
+                    <span class="material-symbols-outlined" aria-hidden="true">pin_drop</span>
+                    ${safe(cat.source_clause || 'Section reference')}
+                  </summary>
+                  <blockquote>${safe(cat.source_text || '')}</blockquote>
+                </details>
+              ` : '';
+
+              return `
+                <div class="risk-category-row">
+                  <div class="risk-category-meta">
+                    <span class="risk-category-name">${safe(cat.name)}</span>
+                    <span class="risk-category-score" style="color: ${catColor};">${score}</span>
+                  </div>
+                  <div class="risk-progress-track">
+                    <div class="risk-progress-bar" style="width: ${Math.min(Math.max(score, 0), 100)}%; background-color: ${catColor};"></div>
+                  </div>
+                  ${cat.note ? `<div class="risk-category-note">${safe(cat.note)}</div>` : ''}
+                  ${sourceHtml}
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `;
+      }
+
+      slot.innerHTML = `
+        <div class="visual-card reveal">
+          <div class="visual-card-header">
+            <span class="material-symbols-outlined" style="color: var(--accent-blue);" aria-hidden="true">shield</span>
+            <h2 class="visual-card-title">Risk Assessment</h2>
+          </div>
+          <div class="risk-meter-content">
+            <div class="risk-arc-wrapper">
+              ${buildArc(overallScore)}
+              <div class="risk-level-label" style="color: ${scoreColor};">${levelLabel}</div>
+            </div>
+            ${categoriesHtml}
+          </div>
+        </div>
+      `;
+    }
+
+    // VISUAL 2: Clause Map
+    const clauseConfig = {
+      obligation : { color: 'var(--accent-amber)', icon: 'assignment'   },
+      right      : { color: 'var(--accent-green)', icon: 'verified'     },
+      risk       : { color: 'var(--accent-red)',   icon: 'warning'      },
+      penalty    : { color: 'var(--accent-red)',   icon: 'gavel'        },
+      termination: { color: 'var(--text-secondary)',icon: 'cancel'      },
+    };
+
+    /** Renders interactive clause map with type-coded cards. */
+    function renderClauseMap(analysis, targetSlot) {
+      const slot = targetSlot || getNextVisualSlot();
+      if (!slot) return;
+
+      const emptyHtml = guardEmpty(analysis, 'clauses', 'clause');
+      let clausesHtml = '';
+
+      if (emptyHtml) {
+        clausesHtml = emptyHtml;
+      } else {
+        const clauses = analysis.clauses || [];
+        clausesHtml = `
+          <div class="clause-map-list">
+            ${clauses.map(clause => {
+              const typeKey = (clause.type || 'obligation').toLowerCase();
+              const config = clauseConfig[typeKey] || clauseConfig.obligation;
+              const sourceHtml = (clause.source_clause || clause.source_text) ? `
+                <details class="source-detail">
+                  <summary>
+                    <span class="material-symbols-outlined" aria-hidden="true">pin_drop</span>
+                    ${safe(clause.source_clause || 'Section reference')}
+                  </summary>
+                  <blockquote>${safe(clause.source_text || '')}</blockquote>
+                </details>
+              ` : '';
+
+              return `
+                <div class="clause-card-item" style="border-left: 3px solid ${config.color};">
+                  <div class="clause-header">
+                    <div class="clause-title">
+                      <span class="material-symbols-outlined" style="font-size: 18px; color: ${config.color};" aria-hidden="true">${config.icon}</span>
+                      <span>${safe(clause.title)}</span>
+                      ${clause.flag ? '<span title="Flagged clause" aria-label="Flagged clause">⚠️</span>' : ''}
+                    </div>
+                    <span class="clause-badge" style="color: ${config.color}; background-color: rgba(255,255,255,0.05); border: 1px solid ${config.color};">
+                      ${safe(clause.type || 'Clause')}
+                    </span>
+                  </div>
+                  <div class="clause-body-text">${safe(clause.plain_english)}</div>
+                  ${sourceHtml}
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `;
+      }
+
+      slot.innerHTML = `
+        <div class="visual-card reveal">
+          <div class="visual-card-header">
+            <span class="material-symbols-outlined" style="color: var(--accent-blue);" aria-hidden="true">map</span>
+            <h2 class="visual-card-title">Clause Map</h2>
+          </div>
+          ${clausesHtml}
+        </div>
+      `;
+    }
+
+    // Red Flags Strip
+    function renderRedFlags(flags) {
+      const container = document.getElementById('red-flags-strip');
+      if (!container) return;
+
+      if (!flags || flags.length === 0) {
+        container.innerHTML = '';
+        container.hidden = true;
+        return;
+      }
+
+      container.hidden = false;
+      container.innerHTML = `
+        <div class="red-flags-card reveal">
+          <div class="red-flags-header">
+            <h2 class="red-flags-title" style="color: var(--accent-red);">
+              <span class="material-symbols-outlined" aria-hidden="true" style="color: var(--accent-red);">flag</span>
+              <span>Key Red Flags</span>
+            </h2>
+          </div>
+          <div class="red-flags-list">
+            ${flags.map(flag => {
+              const sev = (flag.severity || 'medium').toLowerCase();
+              const sevLabel = sev === 'high' ? 'HIGH' : sev === 'low' ? 'LOW' : 'MED';
+              const sevIcon = sev === 'high' ? 'warning' : sev === 'low' ? 'check_circle' : 'info';
+              const sevAria = sev === 'high' ? 'Severity: High' : sev === 'low' ? 'Severity: Low' : 'Severity: Medium';
+              const sourceHtml = (flag.source_clause || flag.source_text) ? `
+                <details class="source-detail">
+                  <summary>
+                    <span class="material-symbols-outlined" aria-hidden="true">pin_drop</span>
+                    ${safe(flag.source_clause || 'Section reference')}
+                  </summary>
+                  <blockquote>${safe(flag.source_text || '')}</blockquote>
+                </details>
+              ` : '';
+
+              return `
+                <div class="red-flag-item">
+                  <div class="red-flag-header">
+                    <span class="severity-pill ${sev}" aria-label="${sevAria}">
+                      <span class="material-symbols-outlined" aria-hidden="true" style="font-size: 13px;">${sevIcon}</span>
+                      <span>${sevLabel}</span>
+                    </span>
+                    <span class="red-flag-title-text">${safe(flag.title)}</span>
+                  </div>
+                  <div class="red-flag-desc">${safe(flag.plain_english)}</div>
+                  ${sourceHtml}
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    // Lawyer CTA
+    function renderLawyerCTA() {
+      const container = document.getElementById('lawyer-prep-cta');
+      if (!container) return;
+
+      container.innerHTML = `
+        <div class="lawyer-cta-card">
+          <div class="lawyer-cta-content">
+            <div class="lawyer-cta-icon-wrapper">
+              <span class="material-symbols-outlined" style="font-size: 24px; color: var(--accent-blue);" aria-hidden="true">handshake</span>
+            </div>
+            <div>
+              <h3 class="lawyer-cta-heading">Ready to consult a lawyer?</h3>
+              <p class="lawyer-cta-text">
+                We've prepared your briefing document — questions to ask, red flags to raise, and a one-page summary of this document.
+              </p>
+            </div>
+          </div>
+          <button type="button" id="btn-generate-brief" class="btn-primary lawyer-cta-btn" aria-label="Generate Brief">
+            <span>Generate Brief</span>
+            <span class="btn-icon-wrap" aria-hidden="true">
+              <span class="material-symbols-outlined" style="font-size: 18px;">arrow_forward</span>
+            </span>
+          </button>
+        </div>
+      `;
+
+      document.getElementById('btn-generate-brief')?.addEventListener('click', () => {
+        let analysisData = {};
+        try {
+          analysisData = JSON.parse(safeStorage.getItem('lgAnalysis') || '{}');
+        } catch(e) {}
+        renderLawyerPrep(analysisData);
+      });
+    }
+
+    // Main Results Renderer
+    function renderResults(analysis, classification) {
+      stopLoadingCycle();
+
+      // 1. Populate results header
+      const docTypeBadge = document.getElementById('badge-doc-type');
+      const complexityBadge = document.getElementById('badge-complexity');
+      if (docTypeBadge) {
+        docTypeBadge.textContent = classification?.doc_type || 'Legal Document';
+      }
+      if (complexityBadge) {
+        const comp = (classification?.complexity || 'medium').toLowerCase();
+        complexityBadge.textContent = `${comp} complexity`;
+        complexityBadge.className = `badge-complexity ${comp}`;
+      }
+
+      // 2. Populate summary strip
+      const summaryText = document.getElementById('results-summary-text');
+      if (summaryText) {
+        summaryText.textContent = analysis?.doc_summary || 'Document analysis completed.';
+      }
+
+      // 3. Get visuals from safeStorage lgVisuals
+      let visuals = ['risk', 'clauses'];
+      try {
+        const stored = safeStorage.getItem('lgVisuals');
+        if (stored) visuals = JSON.parse(stored);
+      } catch(e) {}
+      const [v1, v2] = visuals;
+
+      // 4. Render each visual into its slot
+      const slot1 = document.getElementById('visual-slot-1');
+      const slot2 = document.getElementById('visual-slot-2');
+      if (slot1) slot1.innerHTML = '';
+      if (slot2) slot2.innerHTML = '';
+
+      const renderers = {
+        'risk'    : (slot) => renderRiskMeter(analysis, slot),
+        'clauses' : (slot) => renderClauseMap(analysis, slot),
+        'timeline': (slot) => renderTimeline(analysis, slot),
+        'battle'  : (slot) => renderBattle(analysis, slot),
+        'lawyer'  : (slot) => renderLawyerPrep(analysis, slot),
+      };
+
+      if (renderers[v1]) renderers[v1](slot1);
+      if (renderers[v2]) renderers[v2](slot2);
+
+      // 5. Render red flags strip if analysis.red_flags exists
+      renderRedFlags(analysis?.red_flags || []);
+
+      // 6. Render lawyer prep CTA (always)
+      renderLawyerCTA();
+
+      // Hook up Analyze New Document button
+      const btnNewDoc = document.getElementById('btn-new-doc');
+      if (btnNewDoc) {
+        btnNewDoc.onclick = () => {
+          window._lg?.recordEvent('new_analysis');
+          showScreen('screen-input');
+        };
+      }
+
+      // 7. Show screen & activate scroll observer
+      showScreen('screen-results');
+      setTimeout(addRevealClasses, 50);
+    }
+
+    // ==========================================================================
+    // VISUAL 3 & 4: Timeline & Battle Renderers
+    // ==========================================================================
+
+    const timelineSeverityColor = {
+      high   : 'var(--accent-red)',
+      medium : 'var(--accent-amber)',
+      low    : 'var(--accent-green)',
+    };
+
+    /** Renders chronological obligation timeline. */
+    function renderTimeline(analysis, targetSlot) {
+      const slot = targetSlot || getNextVisualSlot();
+      if (!slot) return;
+
+      const emptyHtml = guardEmpty(analysis, 'obligations', 'obligation');
+      let contentHtml = '';
+
+      if (emptyHtml) {
+        contentHtml = emptyHtml;
+      } else {
+        const obligations = analysis.obligations || [];
+        contentHtml = `
+          <div class="timeline-container">
+            <ol class="timeline-track" aria-label="Obligation timeline">
+              ${obligations.map(ob => {
+                const sev = (ob.severity || 'medium').toLowerCase();
+                const nodeColor = timelineSeverityColor[sev] || timelineSeverityColor.medium;
+                const sevLabel = sev === 'high' ? 'HIGH' : sev === 'low' ? 'LOW' : 'MED';
+                const sevIcon = sev === 'high' ? 'warning' : sev === 'low' ? 'check_circle' : 'info';
+                const sevAria = sev === 'high' ? 'Severity: High' : sev === 'low' ? 'Severity: Low' : 'Severity: Medium';
+                const sourceHtml = (ob.source_clause || ob.source_text) ? `
+                  <details class="source-detail">
+                    <summary>
+                      <span class="material-symbols-outlined" aria-hidden="true">pin_drop</span>
+                      ${safe(ob.source_clause || 'Section reference')}
+                    </summary>
+                    <blockquote>${safe(ob.source_text || '')}</blockquote>
+                  </details>
+                ` : '';
+
+                return `
+                  <li class="timeline-node" role="listitem" style="--node-color: ${nodeColor};">
+                    <div class="timeline-deadline">${safe(ob.deadline || 'Ongoing / Periodic')}</div>
+                    <div class="timeline-node-card">
+                      <div class="timeline-node-header">
+                        <span class="timeline-title">${safe(ob.title)}</span>
+                        <span class="severity-pill ${sev}" aria-label="${sevAria}">
+                          <span class="material-symbols-outlined" aria-hidden="true" style="font-size: 13px;">${sevIcon}</span>
+                          <span>${sevLabel}</span>
+                        </span>
+                      </div>
+                      ${ob.plain_english ? `<div class="timeline-desc">${safe(ob.plain_english)}</div>` : ''}
+                      ${sourceHtml}
+                    </div>
+                  </li>
+                `;
+              }).join('')}
+            </ol>
+          </div>
+        `;
+      }
+
+      slot.innerHTML = `
+        <div class="visual-card reveal">
+          <div class="visual-card-header">
+            <span class="material-symbols-outlined" style="color: var(--accent-blue);" aria-hidden="true">event_note</span>
+            <h2 class="visual-card-title">Obligation Timeline</h2>
+          </div>
+          ${contentHtml}
+        </div>
+      `;
+    }
+
+    const winnerDisplay = {
+      'A'  : { label: 'Doc A', color: 'var(--accent-green)', icon: 'thumb_up'   },
+      'B'  : { label: 'Doc B', color: 'var(--accent-red)',   icon: 'thumb_down' },
+      'tie': { label: 'Tie',   color: 'var(--text-secondary)',icon: 'remove'    },
+    };
+
+    /** Renders side-by-side contract battle comparison table. */
+    function renderBattle(analysis, targetSlot) {
+      const grid = document.getElementById('visuals-grid');
+      if (grid) {
+        grid.style.gridTemplateColumns = '1fr';
+      }
+
+      const slot = targetSlot || getNextVisualSlot();
+      if (!slot) return;
+
+      const comparisons = analysis.comparisons || [];
+      const score_a = typeof analysis.overall_score_a === 'number' ? analysis.overall_score_a : 50;
+      const score_b = typeof analysis.overall_score_b === 'number' ? analysis.overall_score_b : 50;
+
+      const color_a = score_a >= 70 ? 'var(--accent-red)' : score_a >= 40 ? 'var(--accent-amber)' : 'var(--accent-green)';
+      const color_b = score_b >= 70 ? 'var(--accent-red)' : score_b >= 40 ? 'var(--accent-amber)' : 'var(--accent-green)';
+
+      const tag_a = score_a < score_b ? '✅ Lower Risk' : score_a > score_b ? '⚠️ Higher Risk' : 'Equal Risk';
+      const tag_b = score_b < score_a ? '✅ Lower Risk' : score_b > score_a ? '⚠️ Higher Risk' : 'Equal Risk';
+
+      const isTie = score_a === score_b;
+      const verdict = score_a < score_b
+        ? '✅ Document A appears more favorable based on risk analysis.'
+        : score_b < score_a
+        ? '✅ Document B appears more favorable based on risk analysis.'
+        : 'Both documents carry similar risk levels. Review individual clauses carefully.';
+
+      let tableHtml = '';
+      if (comparisons.length === 0) {
+        tableHtml = `
+          <div style="text-align: center; padding: 40px 20px; color: var(--text-secondary);">
+            <span class="material-symbols-outlined" style="font-size: 40px; color: var(--accent-blue); margin-bottom: 12px;" aria-hidden="true">compare</span>
+            <p style="font-size: 0.95rem;">No comparable clauses were found between the two documents.<br>They may be too different in type to compare directly.</p>
+          </div>
+        `;
+      } else {
+        tableHtml = `
+          <div class="battle-table-wrapper">
+            <table class="battle-table" role="table" aria-label="Contract comparison — Document A versus Document B">
+              <thead>
+                <tr>
+                  <th scope="col">Aspect</th>
+                  <th scope="col">Document A</th>
+                  <th scope="col">Document B</th>
+                  <th scope="col">Winner</th>
+                  <th scope="col">Why</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${comparisons.map(comp => {
+                  const winnerKey = comp.winner === 'A' ? 'A' : comp.winner === 'B' ? 'B' : 'tie';
+                  const wConf = winnerDisplay[winnerKey] || winnerDisplay.tie;
+
+                  return `
+                    <tr>
+                      <td data-label="Aspect"><strong>${safe(comp.aspect)}</strong></td>
+                      <td data-label="Document A">
+                        <div>${safe(comp.doc_a)}</div>
+                        ${comp.doc_a_source ? `<div class="battle-source-muted">via ${safe(comp.doc_a_source)}</div>` : ''}
+                      </td>
+                      <td data-label="Document B">
+                        <div>${safe(comp.doc_b)}</div>
+                        ${comp.doc_b_source ? `<div class="battle-source-muted">via ${safe(comp.doc_b_source)}</div>` : ''}
+                      </td>
+                      <td data-label="Winner">
+                        <span class="battle-winner-badge" style="color: ${wConf.color}; border: 1px solid ${wConf.color};">
+                          <span class="material-symbols-outlined" style="font-size: 14px;" aria-hidden="true">${wConf.icon}</span>
+                          <span>${wConf.label}</span>
+                        </span>
+                      </td>
+                      <td data-label="Why" style="color: var(--text-secondary);">
+                        ${safe(comp.reason)}
+                      </td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+
+      slot.innerHTML = `
+        <div class="visual-card reveal">
+          <div class="visual-card-header" style="justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span class="material-symbols-outlined" style="color: var(--accent-blue);" aria-hidden="true">swords</span>
+              <h2 class="visual-card-title">Clause Battle</h2>
+            </div>
+            <span style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 500;">Document A vs Document B</span>
+          </div>
+
+          <div class="battle-container">
+            <!-- Score Summary Bar -->
+            <div class="battle-scores-strip">
+              <div class="battle-score-card">
+                <span class="battle-score-title">Doc A Risk Score</span>
+                <span class="battle-score-val" style="color: ${color_a};">${score_a}</span>
+                <span class="battle-score-tag" style="color: ${color_a};">${tag_a}</span>
+              </div>
+              <div style="font-size: 1.1rem; color: var(--text-muted); font-weight: 600;" aria-hidden="true">VS</div>
+              <div class="battle-score-card">
+                <span class="battle-score-title">Doc B Risk Score</span>
+                <span class="battle-score-val" style="color: ${color_b};">${score_b}</span>
+                <span class="battle-score-tag" style="color: ${color_b};">${tag_b}</span>
+              </div>
+            </div>
+
+            <!-- Comparison Table -->
+            ${tableHtml}
+
+            <!-- Overall Verdict -->
+            <div class="battle-verdict-strip ${isTie ? 'tie' : ''}">
+              <div class="battle-verdict-title">${verdict}</div>
+              <div class="battle-verdict-note">⚖️ This comparison is for informational purposes only.</div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // ==========================================================================
+    // Lawyer Prep Briefing & Consult Card Logic
+    // ==========================================================================
+
+    const CONSULT_DEFAULTS = {
+      too_ambiguous:
+        "This document contains language that can be interpreted in more than one way. A qualified lawyer should clarify its meaning before you sign or act on it.",
+      incomplete:
+        "This document appears incomplete or uses highly jurisdiction-specific terms. A lawyer familiar with your region's laws should review it.",
+      not_legal:
+        "This doesn't appear to be a standard legal document. If you believe it is, try pasting a larger section — or bring it directly to a legal professional.",
+      parse_fail:
+        "We weren't able to fully process this document. This can happen with unusual formatting or very complex language. A lawyer's review is recommended.",
+      default:
+        "This document requires professional legal review. We've identified elements that go beyond what an automated tool can reliably analyze."
+    };
+
+    function getConsultMessage(reason) {
+      if (!reason || typeof reason !== 'string') return CONSULT_DEFAULTS.default;
+      const lower = reason.toLowerCase();
+      if (lower.includes('ambigu')) return CONSULT_DEFAULTS.too_ambiguous;
+      if (lower.includes('incomplete') || lower.includes('jurisdiction') || lower.includes('short')) return CONSULT_DEFAULTS.incomplete;
+      if (lower.includes('not legal') || lower.includes('not a legal') || lower.includes('non-legal')) return CONSULT_DEFAULTS.not_legal;
+      if (lower.includes('parse') || lower.includes('format') || lower.includes('process') || lower.includes('could not')) return CONSULT_DEFAULTS.parse_fail;
+      if (reason.length > 10 && !reason.includes('Error') && !reason.includes('STATUS_') && !reason.includes('{')) {
+        return reason;
+      }
+      return CONSULT_DEFAULTS.default;
+    }
+
+    /** Renders dignified consult card when document needs professional review. */
+    function renderConsultCard(consultReason) {
+      window._lg?.recordEvent('consult_card_shown');
+      stopLoadingCycle();
+      showScreen('screen-results');
+
+      const reasonText = getConsultMessage(consultReason);
+
+      const grid = document.getElementById('visuals-grid');
+      if (grid) {
+        grid.style.gridTemplateColumns = '1fr';
+        grid.innerHTML = `
+          <div class="consult-card reveal" role="region" aria-label="Professional review recommended">
+            <div class="consult-icon" aria-hidden="true">⚖️</div>
+            <h2 class="consult-title">This document needs professional review.</h2>
+            <p class="consult-reason">${safe(reasonText)}</p>
+            
+            <div class="consult-findings">
+              <div class="consult-findings-title">What we did find:</div>
+              <ul>
+                <li>Document appears to be a legal document</li>
+                <li>Contains clauses requiring expert judgment</li>
+                <li>Jurisdiction-specific rules may apply</li>
+              </ul>
+            </div>
+
+            <button type="button" id="btn-consult-brief" class="btn-primary" style="margin: 0 auto 16px; max-width: 280px;" aria-label="Generate Lawyer Briefing">
+              <span>Generate Briefing</span>
+              <span class="btn-icon-wrap" aria-hidden="true">
+                <span class="material-symbols-outlined" style="font-size: 18px;">description</span>
+              </span>
+            </button>
+
+            <p class="consult-note">
+              This is not a limitation of the tool — some documents genuinely require a legal expert.
+            </p>
+          </div>
+        `;
+
+        document.getElementById('btn-consult-brief')?.addEventListener('click', () => {
+          let analysisData = {};
+          try {
+            analysisData = JSON.parse(safeStorage.getItem('lgAnalysis') || '{}');
+          } catch (e) {}
+          renderLawyerPrep(analysisData);
+        });
+      }
+
+      renderLawyerCTA();
+      setTimeout(addRevealClasses, 50);
+    }
+
+    /** Generates and renders lawyer consultation briefing via Gemini Call 3. */
+    async function renderLawyerPrep(analysis, slot) {
+      if (!appReady) {
+        showErrorBanner('Server not reachable. Please refresh.');
+        return;
+      }
+      assertOnline();
+      const ctaBtn = document.getElementById('btn-generate-brief');
+      const panel = document.getElementById('lawyer-prep-panel');
+      const consultBriefBtn = document.getElementById('btn-consult-brief');
+
+      if (ctaBtn) {
+        ctaBtn.disabled = true;
+        ctaBtn.innerHTML = `
+          <span class="btn-spinner-inline" aria-hidden="true"></span>
+          <span role="status" aria-live="polite">Preparing your briefing...</span>
+        `;
+      }
+      if (consultBriefBtn) {
+        consultBriefBtn.disabled = true;
+        consultBriefBtn.innerHTML = `
+          <span class="btn-spinner-inline" aria-hidden="true"></span>
+          <span role="status" aria-live="polite">Preparing briefing...</span>
+        `;
+      }
+      if (slot) {
+        slot.innerHTML = `
+          <div class="visual-card" style="text-align: center; padding: 48px 24px;">
+            <div class="btn-spinner-inline" style="width: 28px; height: 28px; border-width: 3px; border-color: rgba(91, 141, 239, 0.3); border-top-color: var(--accent-blue); margin-bottom: 16px;" aria-hidden="true"></div>
+            <p role="status" aria-live="polite" style="color: var(--text-secondary); font-size: 0.92rem;">Preparing your lawyer briefing...</p>
+          </div>
+        `;
+      }
+
+      try {
+        const docA = sanitizeDoc(safeStorage.getItem('lgDocA') || '');
+        if (!docA) throw new Error('NO_DOCUMENT');
+
+        const lawyerPrompt = `Analyze this document and generate a lawyer consultation briefing.
+Return JSON matching this schema EXACTLY:
+{
+  "one_page_summary": "string — 4 sentences max, plain English overview",
+  "red_flags": [
+    {
+      "flag": "string — issue title",
+      "source_clause": "string",
+      "source_text": "string — verbatim from document",
+      "question_to_ask": "string — exact question user should ask their lawyer"
+    }
+  ],
+  "questions_to_ask": [
+    "string — standalone question not tied to a specific clause"
+  ],
+  "negotiation_points": [
+    {
+      "point": "string — what to push back on",
+      "source_clause": "string",
+      "source_text": "string"
+    }
+  ],
+  "jurisdiction_note": "string — note about jurisdiction if detectable, else null",
+  "consult_lawyer": boolean,
+  "consult_reason": "string | null"
+}
+
+RULES:
+- source_text must be copied verbatim from the document.
+- questions_to_ask: max 5 items.
+- red_flags: only include if direct source exists in document.
+- Never give legal advice. Frame everything as questions or observations.
+
+DOCUMENT:
+${docA}`;
+
+        const requestBody = {
+          model: 'gemini-3.1-flash-lite',
+          system_instruction: {
+            parts: [{
+              text: `You are a legal assistant helping a user prepare for a lawyer consultation.\nRespond ONLY in valid JSON. No markdown. No explanation.\nBase everything strictly on the provided document.\nNever fabricate clause references.`
+            }]
+          },
+          contents: [{
+            role: "user",
+            parts: [{ text: lawyerPrompt }]
+          }],
+          generationConfig: {
+            responseMimeType: "application/json",
+            temperature: 0.1,
+            maxOutputTokens: 1000
+          }
+        };
+
+        const response = await fetch('/api/gemini', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody)
+        });
+
+        if (!response.ok) {
+          throw new Error(`STATUS_${response.status}`);
+        }
+
+        const data = await response.json();
+        const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!rawText) throw new Error('JSON_PARSE_FAIL');
+
+        let briefing;
+        try {
+          briefing = JSON.parse(rawText);
+        } catch (parseErr) {
+          throw new Error('JSON_PARSE_FAIL');
+        }
+
+        // Build Briefing HTML
+        const onePageSummary = briefing.one_page_summary || 'Overview not available.';
+        const redFlags = briefing.red_flags || [];
+        const questions = briefing.questions_to_ask || [];
+        const negotiationPoints = briefing.negotiation_points || [];
+        const jurisdictionNote = briefing.jurisdiction_note;
+
+        let redFlagsHtml = '';
+        if (redFlags.length > 0) {
+          redFlagsHtml = `
+            <div class="lp-section-header">Red Flags to Raise</div>
+            <div class="lp-red-flags-list">
+              ${redFlags.map(rf => {
+                const sourceHtml = (rf.source_clause || rf.source_text) ? `
+                  <details class="source-detail">
+                    <summary>
+                      <span class="material-symbols-outlined" aria-hidden="true">pin_drop</span>
+                      ${safe(rf.source_clause || 'Section reference')}
+                    </summary>
+                    <blockquote>${safe(rf.source_text || '')}</blockquote>
+                  </details>
+                ` : '';
+
+                return `
+                  <div class="lp-red-flag-item">
+                    <div class="lp-red-flag-header">
+                      <span style="color: var(--accent-red); font-size: 1rem;" aria-hidden="true">🔴</span>
+                      <span>${safe(rf.flag)}</span>
+                    </div>
+                    ${rf.question_to_ask ? `<div class="lp-ask-lawyer">Ask your lawyer: &ldquo;${safe(rf.question_to_ask)}&rdquo;</div>` : ''}
+                    ${sourceHtml}
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `;
+        }
+
+        let questionsHtml = '';
+        if (questions.length > 0) {
+          questionsHtml = `
+            <div class="lp-section-header">Questions to Ask</div>
+            <div class="lp-questions-list" role="group" aria-label="Questions checklist">
+              ${questions.slice(0, 5).map(q => `
+                <label class="lp-question">
+                  <input type="checkbox" aria-label="Question: ${safe(q)}">
+                  <span>${safe(q)}</span>
+                </label>
+              `).join('')}
+            </div>
+          `;
+        }
+
+        let negotiationsHtml = '';
+        if (negotiationPoints.length > 0) {
+          negotiationsHtml = `
+            <div class="lp-section-header">Negotiation Points</div>
+            <div class="lp-negotiations-list">
+              ${negotiationPoints.map(np => {
+                const sourceHtml = (np.source_clause || np.source_text) ? `
+                  <details class="source-detail">
+                    <summary>
+                      <span class="material-symbols-outlined" aria-hidden="true">pin_drop</span>
+                      ${safe(np.source_clause || 'Section reference')}
+                    </summary>
+                    <blockquote>${safe(np.source_text || '')}</blockquote>
+                  </details>
+                ` : '';
+
+                return `
+                  <div class="lp-negotiation-item">
+                    <div class="lp-negotiation-header">
+                      <span style="font-size: 1rem;" aria-hidden="true">💬</span>
+                      <span>${safe(np.point)}</span>
+                      ${np.source_clause ? `<span class="lp-negotiation-clause">(${safe(np.source_clause)})</span>` : ''}
+                    </div>
+                    ${np.source_text ? `<div class="lp-negotiation-desc">${safe(np.source_text)}</div>` : ''}
+                    ${sourceHtml}
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `;
+        }
+
+        let jurisdictionHtml = '';
+        if (jurisdictionNote) {
+          jurisdictionHtml = `
+            <div class="lp-section-header">Jurisdiction Note</div>
+            <div class="lp-jurisdiction-box">
+              <span class="material-symbols-outlined" style="color: var(--accent-blue); font-size: 18px;" aria-hidden="true">info</span>
+              <span>${safe(jurisdictionNote)}</span>
+            </div>
+          `;
+        }
+
+        const panelHtml = `
+          <div class="lp-panel-card reveal" id="lawyer-prep-briefing-card">
+            <div class="lp-header">
+              <h2 class="lp-title" style="font-size: 1.15rem;">
+                <span class="material-symbols-outlined" style="color: var(--accent-blue); font-size: 22px;" aria-hidden="true">description</span>
+                <span>Your Lawyer Briefing</span>
+              </h2>
+              <button type="button" class="btn-ghost" onclick="window.print()" aria-label="Save or Print Briefing">
+                <span class="material-symbols-outlined" style="font-size: 16px;" aria-hidden="true">print</span>
+                <span>Save / Print</span>
+              </button>
+            </div>
+
+            <div class="lp-section-header">Document Overview</div>
+            <p class="lp-summary-text">${safe(onePageSummary)}</p>
+
+            ${redFlagsHtml}
+            ${questionsHtml}
+            ${negotiationsHtml}
+            ${jurisdictionHtml}
+
+            <div class="lp-disclaimer">
+              ⚖️ This briefing is for preparation only. It does not constitute legal advice.
+            </div>
+          </div>
+        `;
+
+        if (slot) {
+          slot.innerHTML = panelHtml;
+        } else if (panel) {
+          panel.innerHTML = panelHtml;
+          panel.hidden = false;
+          panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        if (ctaBtn) {
+          ctaBtn.disabled = false;
+          ctaBtn.innerHTML = `
+            <span>Briefing Generated</span>
+            <span class="btn-icon-wrap" aria-hidden="true">
+              <span class="material-symbols-outlined" style="font-size: 18px;">check</span>
+            </span>
+          `;
+        }
+        if (consultBriefBtn) {
+          consultBriefBtn.disabled = false;
+          consultBriefBtn.innerHTML = `
+            <span>Briefing Generated</span>
+            <span class="btn-icon-wrap" aria-hidden="true">
+              <span class="material-symbols-outlined" style="font-size: 18px;">check</span>
+            </span>
+          `;
+        }
+
+        window._lg?.recordEvent('lawyer_prep_generated');
+
+        setTimeout(addRevealClasses, 50);
+
+      } catch (err) {
+        if (ctaBtn) {
+          ctaBtn.disabled = false;
+          ctaBtn.innerHTML = `
+            <span>Generate Brief</span>
+            <span class="btn-icon-wrap" aria-hidden="true">
+              <span class="material-symbols-outlined" style="font-size: 18px;">arrow_forward</span>
+            </span>
+          `;
+        }
+        if (consultBriefBtn) {
+          consultBriefBtn.disabled = false;
+          consultBriefBtn.innerHTML = `
+            <span>Generate Briefing</span>
+            <span class="btn-icon-wrap" aria-hidden="true">
+              <span class="material-symbols-outlined" style="font-size: 18px;">description</span>
+            </span>
+          `;
+        }
+        renderConsultCard("Briefing could not be generated.");
+      }
+    }
+
+    // Step 1 — Initial Screen on Load
+    document.addEventListener('DOMContentLoaded', async () => {
+      await initApp(); // replaces initApiKey()
+      if (!appReady) return;
+      showScreen('screen-input');
+      if (window._lg) {
+        window._lg.recordSession();
+      }
+      addRevealClasses();
+
+      // ─── Settings Panel Logic ───────────────────────────────
+      const btnSettings   = document.getElementById('btn-settings');
+      const settingsPanel = document.getElementById('settings-panel');
+      const keyInput      = document.getElementById('api-key-input');
+      const btnKeyToggle  = document.getElementById('btn-key-toggle');
+      const btnKeySave    = document.getElementById('btn-key-save');
+      const keyError      = document.getElementById('api-key-error');
+      const keySavedMsg   = document.getElementById('api-key-saved-msg');
+      const statusDot     = document.getElementById('settings-status-dot');
+
+      // On load — check if key already exists in sessionStorage
+      function initKeyState() {
+        const stored = sessionStorage.getItem('lgKey');
+        if (stored) {
+          if (keyInput) keyInput.value = stored;
+          if (statusDot) statusDot.className = 'status-dot status-dot--saved';
+          if (btnSettings) btnSettings.classList.add('has-key');
+        } else {
+          // No key — auto-open settings panel
+          openSettingsPanel();
+        }
+      }
+
+      function openSettingsPanel() {
+        if (!settingsPanel || !btnSettings) return;
+        settingsPanel.hidden = false;
+        btnSettings.setAttribute('aria-expanded', 'true');
+        setTimeout(() => {
+          if (keyInput) keyInput.focus();
+        }, 50);
+      }
+
+      function closeSettingsPanel() {
+        if (!settingsPanel || !btnSettings) return;
+        settingsPanel.hidden = true;
+        btnSettings.setAttribute('aria-expanded', 'false');
+      }
+
+      // Expose helpers to window if needed
+      window.openSettingsPanel = openSettingsPanel;
+      window.closeSettingsPanel = closeSettingsPanel;
+
+      // Toggle panel
+      if (btnSettings) {
+        btnSettings.addEventListener('click', () => {
+          const isOpen = btnSettings.getAttribute('aria-expanded') === 'true';
+          isOpen ? closeSettingsPanel() : openSettingsPanel();
+        });
+      }
+
+      // Show/hide key toggle
+      if (btnKeyToggle && keyInput) {
+        btnKeyToggle.addEventListener('click', () => {
+          const isPassword = keyInput.type === 'password';
+          keyInput.type = isPassword ? 'text' : 'password';
+          btnKeyToggle.setAttribute('aria-label', isPassword ? 'Hide API key' : 'Show API key');
+          const icon = btnKeyToggle.querySelector('.material-symbols-outlined');
+          if (icon) icon.textContent = isPassword ? 'visibility_off' : 'visibility';
+        });
+      }
+
+      // Save key
+      if (btnKeySave && keyInput) {
+        btnKeySave.addEventListener('click', () => {
+          const key = keyInput.value.trim();
+          if (keyError) keyError.hidden = true;
+          if (keySavedMsg) keySavedMsg.hidden = true;
+
+          if (!key) {
+            if (keyError) {
+              keyError.textContent = 'Please enter your API key.';
+              keyError.hidden = false;
+            }
+            return;
+          }
+          if (key.length < 20) {
+            if (keyError) {
+              keyError.textContent = 'This does not look like a valid API key.';
+              keyError.hidden = false;
+            }
+            return;
+          }
+
+          // Save to sessionStorage
+          sessionStorage.setItem('lgKey', key);
+
+          // Update UI state
+          if (statusDot) statusDot.className = 'status-dot status-dot--saved';
+          if (btnSettings) btnSettings.classList.add('has-key');
+          if (keySavedMsg) keySavedMsg.hidden = false;
+
+          // Close panel after short delay
+          setTimeout(() => closeSettingsPanel(), 900);
+        });
+      }
+
+      // Clear error on keydown
+      if (keyInput) {
+        keyInput.addEventListener('keydown', () => {
+          if (keyError) keyError.hidden = true;
+        });
+
+        // Save on Enter
+        keyInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' && btnKeySave) btnKeySave.click();
+        });
+      }
+
+      // Init on load
+      initKeyState();
+    });
+  </script>
+
+  <!-- Firebase Integration Module -->
+  <script type="module">
+    import { initializeApp }
+      from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+    import { getDatabase, ref, push, set }
+      from "https://www.gstatic.com/firebasejs/11.0.0/firebase-database.js";
+    import { getAnalytics, logEvent }
+      from "https://www.gstatic.com/firebasejs/11.0.0/firebase-analytics.js";
+
+    let db        = null;
+    let analytics = null;
+
+    // ── Session ID — anonymous UUID, one per page load ───
+    const SESSION_ID = crypto.randomUUID
+      ? crypto.randomUUID()
+      : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+          const r = Math.random() * 16 | 0;
+          return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+        });
+
+    /**
+     * Called by initApp() with config fetched from server.
+     * Config arrives at runtime — never hardcoded in HTML.
+     */
+    window.initFirebase = async function(config) {
+      try {
+        const firebaseApp = initializeApp(config);
+        db        = getDatabase(firebaseApp);
+        analytics = getAnalytics(firebaseApp);
+      } catch (e) {
+        console.error('Firebase init error:', e.message);
+        // Non-fatal — app still works without analytics
+      }
+    };
+
+    // ── Analytics helpers — all silent, never block app ──
+    window._lg = {
+
+      /** Records anonymous session start */
+      recordSession() {
+        if (!db) return;
+        try {
+          set(ref(db, `sessions/${SESSION_ID}`), {
+            timestamp: new Date().toISOString(),
+            platform : 'web',
+          });
+          if (analytics) logEvent(analytics, 'session_start');
+        } catch { /* silent */ }
+      },
+
+      /**
+       * Records analysis metadata — no document content ever
+       * @param {object} classification — from Gemini Call 1
+       * @param {string[]} visuals      — two visual keys shown
+       * @param {boolean} consultLawyer — lawyer referral flag
+       * @param {number} durationMs     — analysis duration
+       */
+      recordAnalysis(classification, visuals, consultLawyer, durationMs) {
+        if (!db) return;
+        try {
+          push(ref(db, 'analyses'), {
+            session_id          : SESSION_ID,
+            timestamp           : new Date().toISOString(),
+            doc_type            : classification.doc_type       || 'unknown',
+            complexity          : classification.complexity      || 'unknown',
+            is_comparison       : classification.is_comparison   || false,
+            primary_concern     : classification.primary_concern || 'unknown',
+            visuals_shown       : visuals                        || [],
+            consult_lawyer      : consultLawyer                  || false,
+            analysis_duration_ms: durationMs                    || 0,
+          });
+          if (analytics) logEvent(analytics, 'analysis_run', {
+            doc_type  : classification.doc_type,
+            complexity: classification.complexity,
+          });
+        } catch { /* silent */ }
+      },
+
+      /**
+       * Records key engagement events
+       * @param {string} eventName — one of the approved event names
+       */
+      recordEvent(eventName) {
+        const allowed = [
+          'lawyer_prep_generated',
+          'source_expanded',
+          'new_analysis',
+          'compare_mode_used',
+          'consult_card_shown',
+        ];
+        if (!db || !allowed.includes(eventName)) return;
+        try {
+          push(ref(db, 'events'), {
+            session_id: SESSION_ID,
+            timestamp : new Date().toISOString(),
+            event     : eventName,
+          });
+          if (analytics) logEvent(analytics, eventName);
+        } catch { /* silent */ }
+      },
+
+    };
+  </script>
+</body>
+</html>

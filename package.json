@@ -1,0 +1,13 @@
+{
+  "name": "lexguard",
+  "version": "1.0.0",
+  "description": "AI-powered legal document intelligence",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.0.0"
+  }
+}
